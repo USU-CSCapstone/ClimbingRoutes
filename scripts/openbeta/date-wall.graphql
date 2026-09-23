@@ -1,0 +1,32 @@
+# Date Wall, Logan Canyon, Utah.
+# Looked up by uuid because area names are not unique across OpenBeta.
+# Fields that come back empty for this wall (length, boltsCount, safety,
+# description, location, protection) are left out on purpose.
+query DateWall($uuid: ID) {
+  area(uuid: $uuid) {
+    uuid
+    area_name
+    pathTokens
+    totalClimbs
+    metadata {
+      lat
+      lng
+    }
+    climbs {
+      uuid
+      name
+      fa
+      grades {
+        yds
+        french
+      }
+      type {
+        sport
+      }
+      metadata {
+        leftRightIndex
+        mp_id
+      }
+    }
+  }
+}
