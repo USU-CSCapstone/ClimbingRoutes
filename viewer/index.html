@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Climbing Wall Viewer</title>
+<style>
+  :root { --bg: #1b1d21; --panel: rgba(20, 22, 26, 0.86); --text: #e8e8e8; --muted: #9aa0a6; --route: #ffd23f; --straight: #ff5a5a; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; touch-action: none; }
+  body.drawing canvas { cursor: crosshair; }
+  .panel { position: fixed; background: var(--panel); border-radius: 8px; padding: 10px 12px; backdrop-filter: blur(4px); }
+  #stats { top: 12px; left: 12px; min-width: 220px; }
+  #stats h1, #routePanel h2 { font-size: 14px; margin: 0 0 6px; }
+  #stats table { border-collapse: collapse; }
+  #stats td { padding: 1px 10px 1px 0; }
+  #stats td:first-child { color: var(--muted); }
+  #fps { top: 12px; right: 12px; font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; }
+  #controls { bottom: 12px; left: 12px; }
+  #controls label { cursor: pointer; }
+  #routePanel { top: 60px; right: 12px; width: 280px; }
+  #routePanel select { width: 100%; margin-bottom: 8px; font: inherit; }
+  #routePanel .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+  #routePanel button { font: inherit; padding: 3px 9px; border-radius: 6px; border: 1px solid #555; background: #2a2d33; color: var(--text); cursor: pointer; }
+  #routePanel button:hover { background: #353941; }
+  #routePanel button.on { background: var(--route); color: #1b1d21; border-color: var(--route); font-weight: 600; }
+  #routeStatus { color: var(--muted); font-size: 12px; }
+  #routeStatus b { color: var(--text); font-weight: 600; }
+  .swatch { display: inline-block; width: 16px; height: 3px; vertical-align: middle; margin-right: 5px; }
+  #status { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 15px; pointer-events: none; }
+  .hint { color: var(--muted); margin-top: 4px; }
+  .route-label { transform: translateY(-20px); background: rgba(15, 16, 19, 0.9); color: #fff; border-left: 3px solid var(--route); border-radius: 4px; padding: 2px 8px; font: 600 13px/1.4 system-ui, sans-serif; white-space: nowrap; pointer-events: none; }
+  .route-label span { color: var(--route); margin-left: 6px; }
+  @media (max-width: 700px) { #stats { font-size: 11px; min-width: 0; } #routePanel { top: auto; bottom: 96px; left: 12px; width: auto; } }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+    "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/build/index.module.js"
+} }
+</script>
+</head>
+<body>
+<div id="status">Loading model…</div>
+<div id="stats" class="panel" hidden>
+  <h1 id="modelName">Climbing wall model</h1>
+  <table id="statsTable"></table>
+</div>
+<div id="fps" class="panel">– fps</div>
+<div id="routePanel" class="panel" hidden>
+  <h2>Route (POC #13)</h2>
+  <select id="routeSelect" aria-label="Route name and grade"></select>
+  <div class="row">
+    <button id="drawBtn">Draw route</button>
+    <button id="undoBtn">Undo</button>
+    <button id="clearBtn">Clear</button>
+    <button id="copyBtn">Copy JSON</button>
+  </div>
+  <div class="row"><label><input type="checkbox" id="straightChk"> Show straight segments too</label></div>
+  <div class="row">Views:
+    <button data-view="0,0">Front</button><button data-view="-40,0">Left</button><button data-view="40,0">Right</button><button data-view="0,25">Above</button><button data-view="0,-25">Below</button>
+  </div>
+  <div id="routeStatus"></div>
+</div>
+<div id="controls" class="panel">
+  <label><input type="checkbox" id="arc"> Limit to front arc (90° across, 60° up and down, as in #11)</label>
+  <div class="hint">Drag to orbit · scroll to zoom · right-drag to pan</div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+
+// Tap-to-place and draping cast thousands of rays at a 1M-triangle mesh, so use a BVH.
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+
+// Models live in data/models/. Pick another with ?model=../data/models/<file>.glb
+const MODEL_URL = new URLSearchParams(location.search).get('model') || '../data/models/wall47.glb';
+const OPENBETA_URL = '../data/openbeta/date-wall.json';
+const STORE_KEY = 'route:' + MODEL_URL;
+const ROUTE_COLOR = 0xffd23f, STRAIGHT_COLOR = 0xff5a5a;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+Object.assign(labelRenderer.domElement.style, { position: 'fixed', top: '0', left: '0', pointerEvents: 'none' });
+document.body.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b1d21);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.001, 1000);
+let controls = null;   // created after load, once camera.up is known
+let home = null;       // { az, pol, target, dist } of the straight-on view
+const targets = [];    // meshes a route can be drawn on
+const raycaster = new THREE.Raycaster();
+const lineMaterials = [];
+let edge = 0.05;       // typical triangle edge length; sets sample spacing and line offset
+
+const statusEl = document.getElementById('status');
+const $ = (id) => document.getElementById(id);
+const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+// The mesh is closed off at the reconstruction-region walls with a few large
+// triangles, while the captured surface is many small ones. Average the normals
+// of triangles no bigger than 4x the median area to get the direction the
+// captured face points, and use their midpoints for its extent.
+function findCapturedFace(root) {
+  root.updateMatrixWorld(true);
+  const tri = new THREE.Triangle();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const n = new THREE.Vector3(), mid = new THREE.Vector3();
+  const areas = [], normals = [], mids = [];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position, idx = o.geometry.index;
+    const count = idx ? idx.count : pos.count;
+    for (let i = 0; i < count; i += 3) {
+      a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(o.matrixWorld);
+      b.fromBufferAttribute(pos, idx ? idx.getX(i + 1) : i + 1).applyMatrix4(o.matrixWorld);
+      c.fromBufferAttribute(pos, idx ? idx.getX(i + 2) : i + 2).applyMatrix4(o.matrixWorld);
+      tri.set(a, b, c);
+      areas.push(tri.getArea());
+      tri.getNormal(n); normals.push(n.x, n.y, n.z);
+      tri.getMidpoint(mid); mids.push(mid.x, mid.y, mid.z);
+    }
+  });
+  const sorted = Float64Array.from(areas).sort();
+  const medianArea = sorted[Math.floor(sorted.length / 2)];
+  const facing = new THREE.Vector3(), box = new THREE.Box3(), p = new THREE.Vector3();
+  let kept = 0;
+  for (let t = 0; t < areas.length; t++) {
+    if (areas[t] > medianArea * 4) continue;
+    facing.x += normals[3 * t]; facing.y += normals[3 * t + 1]; facing.z += normals[3 * t + 2];
+    box.expandByPoint(p.set(mids[3 * t], mids[3 * t + 1], mids[3 * t + 2]));
+    kept++;
+  }
+  return { facing: facing.normalize(), box, kept, total: areas.length, medianArea };
+}
+
+const t0 = performance.now();
+const head = await fetch(MODEL_URL, { method: 'HEAD' }).catch(() => null);
+const bytes = head && head.ok ? Number(head.headers.get('content-length')) : NaN;
+
+new GLTFLoader().load(MODEL_URL, (gltf) => {
+  const loadMs = performance.now() - t0;
+  const root = gltf.scene;
+  let tris = 0, verts = 0;
+  const textures = new Map();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const g = o.geometry;
+    verts += g.attributes.position.count;
+    tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+    // Photogrammetry textures already contain the lighting, so render unlit.
+    const src = o.material;
+    if (src.map) textures.set(src.map.uuid, src.map);
+    o.material = new THREE.MeshBasicMaterial({ map: src.map || null, color: src.map ? 0xffffff : 0xb0b0b0, side: THREE.DoubleSide });
+    g.computeBoundsTree();
+    targets.push(o);
+  });
+  scene.add(root);
+
+  // Look straight at the captured face from level ground, orbiting around +Y. The model must
+  // be leveled so that glTF's +Y really is up; then this works even for a wall that leans back.
+  const face = findCapturedFace(root);
+  edge = Math.sqrt(face.medianArea * 2.309);
+  const center = face.box.getCenter(new THREE.Vector3());
+  const radius = face.box.getSize(new THREE.Vector3()).length() / 2;
+  const dist = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2));
+  const level = new THREE.Vector3(face.facing.x, 0, face.facing.z).normalize();
+  camera.up.set(0, 1, 0);
+  camera.near = radius / 100; camera.far = radius * 100; camera.updateProjectionMatrix();
+  camera.position.copy(center).addScaledVector(level, dist);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.target.copy(center);
+  controls.minDistance = radius * 0.02;
+  controls.maxDistance = dist * 3;
+  controls.update();
+  home = { az: controls.getAzimuthalAngle(), pol: controls.getPolarAngle(), target: center.clone(), dist };
+
+  $('arc').addEventListener('change', (e) => {
+    const on = e.target.checked;
+    controls.minAzimuthAngle = on ? home.az - Math.PI / 4 : -Infinity;
+    controls.maxAzimuthAngle = on ? home.az + Math.PI / 4 : Infinity;
+    controls.minPolarAngle = on ? Math.max(0, home.pol - Math.PI / 6) : 0;
+    controls.maxPolarAngle = on ? Math.min(Math.PI, home.pol + Math.PI / 6) : Math.PI;
+    controls.update();
+  });
+
+  const size = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
+  const texInfo = [...textures.values()].map((t) => `${t.image.width}×${t.image.height}`).join(', ') || 'none';
+  const gl = renderer.getContext();
+  $('statsTable').innerHTML =
+    row('Triangles', Math.round(tris).toLocaleString()) +
+    row('Vertices', verts.toLocaleString()) +
+    row('Textures', `${textures.size} (${texInfo})`) +
+    row('File size', isNaN(bytes) ? '?' : (bytes / 1048576).toFixed(1) + ' MB') +
+    row('Load + parse', (loadMs / 1000).toFixed(2) + ' s') +
+    row('Bounding box', [size.x, size.y, size.z].map((v) => v.toFixed(1)).join(' × ') + ' (model units, unscaled)') +
+    row('Captured face', `${(100 * face.kept / face.total).toFixed(0)}% of triangles`) +
+    row('GPU max texture', gl.getParameter(gl.MAX_TEXTURE_SIZE).toLocaleString() + ' px');
+  $('modelName').textContent = decodeURIComponent(MODEL_URL.split('/').pop());
+  $('stats').hidden = false;
+  statusEl.remove();
+  initRoutes();
+  window.viewer = { THREE, scene, camera, controls, root, face, home };
+  window.__viewerReady = { tris: Math.round(tris), verts, textures: texInfo, bytes, loadMs: Math.round(loadMs), edge: +edge.toFixed(4) };
+}, (xhr) => {
+  if (xhr.total) statusEl.textContent = `Loading model… ${Math.round(100 * xhr.loaded / xhr.total)}%`;
+}, (err) => {
+  statusEl.textContent = 'Failed to load model: ' + err.message;
+  window.__viewerError = String(err.message || err);
+});
+
+// ------------------------------------------------------------------ route tool
+const route = { points: [], normals: [], labelId: 'hypothetical' };
+let routeLabels = [{ id: 'hypothetical', name: 'Test route (hypothetical)', grade: '5.9' }];
+let drawing = false;
+let draped = [];   // latest draped polyline, world space
+let lastStats = null;
+const routeGroup = new THREE.Group();
+scene.add(routeGroup);
+
+const labelInner = document.createElement('div');
+labelInner.className = 'route-label';
+const labelOuter = document.createElement('div');
+labelOuter.appendChild(labelInner);
+const label = new CSS2DObject(labelOuter);
+label.visible = false;
+scene.add(label);
+
+// Control points: screen-sized dots drawn on top so they stay grabbable from any angle.
+const dotMaterial = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.beginPath(); g.arc(32, 32, 24, 0, Math.PI * 2);
+  g.fillStyle = '#ffffff'; g.fill();
+  g.lineWidth = 10; g.strokeStyle = '#1b1d21'; g.stroke();
+  return new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), sizeAttenuation: false, depthTest: false });
+})();
+
+function makeLine(pts, color, width, dashed = false) {
+  const geom = new LineGeometry();
+  geom.setPositions(pts.flatMap((p) => [p.x, p.y, p.z]));
+  const mat = new LineMaterial({ color, linewidth: width, dashed, dashSize: edge * 4, gapSize: edge * 3, worldUnits: false });
+  mat.resolution.set(innerWidth, innerHeight);
+  lineMaterials.push(mat);
+  const line = new Line2(geom, mat);
+  line.computeLineDistances();
+  return line;
+}
+
+function clearRouteGroup() {
+  for (const o of [...routeGroup.children]) {
+    routeGroup.remove(o);
+    if (o.isLine2) {
+      o.geometry.dispose();
+      o.material.dispose();
+      lineMaterials.splice(lineMaterials.indexOf(o.material), 1);
+    }
+  }
+}
+
+function pick(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  raycaster.firstHitOnly = true;
+  const hit = raycaster.intersectObjects(targets, false)[0];
+  if (!hit) return null;
+  const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+  if (n.dot(raycaster.ray.direction) > 0) n.negate();   // the side facing the camera
+  return { p: hit.point.clone(), n };
+}
+
+// Straight segments between taps cut through bulges and hang over dips. Instead,
+// sample each segment about once per triangle edge and snap each sample onto the
+// surface along the interpolated normal, taking the hit nearest the chord (so
+// debris further out along the ray is ignored). Then lift everything by a small
+// offset so the line does not z-fight with the mesh.
+function drape(points, normals, offset) {
+  const out = [], devs = [];
+  let misses = 0;
+  raycaster.firstHitOnly = false;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1], na = normals[i], nb = normals[i + 1];
+    const len = a.distanceTo(b);
+    const steps = Math.min(600, Math.max(1, Math.ceil(len / edge)));
+    const h = Math.max(len * 0.5, edge * 20);
+    for (let s = 0; s < steps; s++) {
+      const t = s / steps;
+      const S = a.clone().lerp(b, t);
+      const N = na.clone().lerp(nb, t).normalize();
+      if (s === 0) { out.push(S.addScaledVector(N, offset)); devs.push(0); continue; }   // taps are already on the surface
+      raycaster.set(S.clone().addScaledVector(N, h), N.clone().negate());
+      raycaster.far = 2 * h;
+      const hits = raycaster.intersectObjects(targets, false);
+      if (!hits.length) { out.push(S.addScaledVector(N, offset)); devs.push(NaN); misses++; continue; }
+      let best = hits[0];
+      for (const hit of hits) if (Math.abs(hit.distance - h) < Math.abs(best.distance - h)) best = hit;
+      devs.push(h - best.distance);   // > 0: the straight chord is inside the surface; < 0: it floats
+      const hn = best.face.normal.clone().transformDirection(best.object.matrixWorld);
+      if (hn.dot(N) < 0) hn.negate();
+      out.push(best.point.clone().addScaledVector(hn, offset));
+    }
+  }
+  const last = points.length - 1;
+  out.push(points[last].clone().addScaledVector(normals[last], offset));
+  devs.push(0);
+  raycaster.far = Infinity;
+  raycaster.firstHitOnly = true;
+  let length = 0;
+  for (let i = 1; i < out.length; i++) length += out[i].distanceTo(out[i - 1]);
+  return { draped: out, devs, misses, samples: out.length, length, offset };
+}
+
+function rebuildRoute() {
+  clearRouteGroup();
+  const n = route.points.length;
+  const offset = edge * 0.35;
+  for (const p of route.points) {
+    const dot = new THREE.Sprite(dotMaterial);
+    dot.scale.set(0.014, 0.014, 1);
+    dot.position.copy(p);
+    routeGroup.add(dot);
+  }
+  draped = [];
+  lastStats = null;
+  if (n >= 2) {
+    lastStats = drape(route.points, route.normals, offset);
+    draped = lastStats.draped;
+    routeGroup.add(makeLine(draped, ROUTE_COLOR, 4));
+    if ($('straightChk').checked) {
+      const lifted = route.points.map((p, i) => p.clone().addScaledVector(route.normals[i], offset));
+      routeGroup.add(makeLine(lifted, STRAIGHT_COLOR, 2.5, true));
+    }
+  }
+  const info = routeLabels.find((r) => r.id === route.labelId) || routeLabels[0];
+  labelInner.innerHTML = `${escapeHtml(info.name)}<span>${escapeHtml(info.grade)}</span>`;
+  label.visible = n > 0;
+  if (n > 0) label.position.copy(route.points[0]);
+  updateStatus();
+}
+
+const pct = (a, b) => `${Math.round(100 * a / Math.max(b, 1))}%`;
+function updateStatus() {
+  const n = route.points.length, el = $('routeStatus');
+  if (!n) { el.innerHTML = 'Click <b>Draw route</b>, then click holds on the wall from the start upward. Esc stops drawing; Ctrl+Z undoes a point.'; return; }
+  if (n < 2) { el.innerHTML = '<b>1 point.</b> Click the next hold.'; return; }
+  const d = lastStats, valid = d.devs.filter(Number.isFinite), abs = valid.map(Math.abs);
+  const tol = d.offset * 3;
+  const floats = valid.filter((v) => v < -tol).length, sinks = valid.filter((v) => v > tol).length;
+  el.innerHTML =
+    `<b>${n} points</b>, ${d.length.toFixed(2)} units long, draped over ${d.samples} surface samples` +
+    (d.misses ? `, <b>${d.misses} over holes</b>` : '') + '.<br>' +
+    `<span class="swatch" style="background:#ff5a5a"></span>Straight segments would stray up to <b>${Math.max(...abs).toFixed(2)}</b> units ` +
+    `(mean ${(abs.reduce((s, v) => s + v, 0) / abs.length).toFixed(3)}): ${pct(floats, valid.length)} floating, ${pct(sinks, valid.length)} sunk in.<br>` +
+    `<span class="swatch" style="background:#ffd23f"></span>Draped line: ${d.offset.toFixed(3)} units off the surface wherever it hit.`;
+}
+
+function saveRoute() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ labelId: route.labelId, points: route.points.map((p) => p.toArray()), normals: route.normals.map((v) => v.toArray()) }));
+  } catch (e) { /* storage unavailable; the route just won't survive a reload */ }
+}
+
+function loadSavedRoute() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (s && Array.isArray(s.points) && s.points.length === s.normals.length) {
+      route.points = s.points.map((a) => new THREE.Vector3(...a));
+      route.normals = s.normals.map((a) => new THREE.Vector3(...a));
+      route.labelId = s.labelId || route.labelId;
+    }
+  } catch (e) { /* ignore unreadable storage */ }
+}
+
+function routeJSON() {
+  const info = routeLabels.find((r) => r.id === route.labelId) || routeLabels[0];
+  const r4 = (v) => v.toArray().map((x) => +x.toFixed(4));
+  return {
+    model: MODEL_URL,
+    openbeta_uuid: info.id === 'hypothetical' ? null : info.id,
+    name: info.name,
+    grade: info.grade,
+    points: route.points.map(r4),
+    normals: route.normals.map(r4),
+  };
+}
+
+function setDrawing(on) {
+  drawing = on;
+  $('drawBtn').classList.toggle('on', on);
+  $('drawBtn').textContent = on ? 'Drawing… (Esc)' : 'Draw route';
+  document.body.classList.toggle('drawing', on);
+}
+
+function undo() {
+  if (!route.points.length) return;
+  route.points.pop();
+  route.normals.pop();
+  rebuildRoute();
+  saveRoute();
+}
+
+function routeFrame() {
+  if (draped.length < 2) return { target: home.target, dist: home.dist };
+  const box = new THREE.Box3().setFromPoints(draped);
+  const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, edge * 40);
+  return { target: box.getCenter(new THREE.Vector3()), dist: (r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.25 };
+}
+
+// Views relative to the straight-on direction, framed on the route (the five-angle check).
+function setView(azDeg, elDeg) {
+  const frame = routeFrame();
+  const toYUp = new THREE.Quaternion().setFromUnitVectors(camera.up, new THREE.Vector3(0, 1, 0));
+  const sph = new THREE.Spherical(frame.dist, home.pol - THREE.MathUtils.degToRad(elDeg), home.az + THREE.MathUtils.degToRad(azDeg));
+  const offset = new THREE.Vector3().setFromSpherical(sph).applyQuaternion(toYUp.invert());
+  controls.target.copy(frame.target);
+  camera.position.copy(frame.target).add(offset);
+  controls.update();
+}
+
+async function initRoutes() {
+  try {
+    const j = await (await fetch(OPENBETA_URL)).json();
+    const area = j.data.area;
+    const climbs = area.climbs.slice().sort((a, b) => (a.metadata?.leftRightIndex ?? 0) - (b.metadata?.leftRightIndex ?? 0));
+    routeLabels = routeLabels.concat(climbs.map((c) => ({ id: c.uuid, name: c.name, grade: c.grades?.yds || '?', area: area.area_name })));
+  } catch (e) { /* no OpenBeta file next to the viewer; keep the hypothetical label */ }
+  $('routeSelect').innerHTML = routeLabels.map((r) =>
+    `<option value="${r.id}">${escapeHtml(r.name)} · ${escapeHtml(r.grade)}${r.area ? ` (OpenBeta: ${escapeHtml(r.area)})` : ''}</option>`).join('');
+  loadSavedRoute();
+  $('routeSelect').value = route.labelId;
+  $('routePanel').hidden = false;
+
+  $('routeSelect').onchange = () => { route.labelId = $('routeSelect').value; rebuildRoute(); saveRoute(); };
+  $('drawBtn').onclick = () => setDrawing(!drawing);
+  $('undoBtn').onclick = undo;
+  $('clearBtn').onclick = () => { route.points = []; route.normals = []; rebuildRoute(); saveRoute(); };
+  $('straightChk').onchange = rebuildRoute;
+  $('copyBtn').onclick = async () => {
+    const text = JSON.stringify(routeJSON(), null, 2);
+    try { await navigator.clipboard.writeText(text); $('copyBtn').textContent = 'Copied'; }
+    catch (e) { console.log(text); $('copyBtn').textContent = 'See console'; }
+    setTimeout(() => { $('copyBtn').textContent = 'Copy JSON'; }, 1500);
+  };
+  for (const b of document.querySelectorAll('[data-view]')) {
+    b.onclick = () => { const [az, el] = b.dataset.view.split(',').map(Number); setView(az, el); };
+  }
+
+  // A click (little movement, short press) places a point; a drag still orbits.
+  let down = null;
+  renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now(), button: e.button }; });
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    const d = down;
+    down = null;
+    if (!drawing || !d || d.button !== 0) return;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6 || performance.now() - d.t > 600) return;
+    const hit = pick(e.clientX, e.clientY);
+    if (!hit) { $('routeStatus').innerHTML = '<b>Missed the model.</b> Click on the wall.'; return; }
+    route.points.push(hit.p);
+    route.normals.push(hit.n);
+    rebuildRoute();
+    saveRoute();
+  });
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && drawing) setDrawing(false);
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+  });
+
+  rebuildRoute();
+  window.routeTool = { route, routeJSON, get draped() { return draped; }, get stats() { return lastStats; }, setView };
+}
+
+// Frame-rate readout, averaged over half-second windows.
+const fpsEl = $('fps');
+let frames = 0, last = performance.now();
+renderer.setAnimationLoop(() => {
+  if (controls) controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+  frames++;
+  const now = performance.now();
+  if (now - last >= 500) { fpsEl.textContent = Math.round(frames * 1000 / (now - last)) + ' fps'; frames = 0; last = now; }
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+  for (const m of lineMaterials) m.resolution.set(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
