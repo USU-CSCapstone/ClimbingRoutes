@@ -4,9 +4,9 @@ Prove that phone photos of a real Logan Canyon wall can become a 3D model that a
 
 ## Purpose
 
-The POC exists to answer four questions before the team commits to the pipeline, the platform, or the wall height target.
+The POC exists to answer four questions before the team commits to the platform or the wall height target.
 
-1. Which free reconstruction pipeline produces a legible wall model, and at what processing cost?
+1. Does RealityScan produce a legible wall model, and at what processing cost?
 2. How legible is the top third of a wall captured from the ground?
 3. Can a phone render the compressed model smoothly?
 4. Does a route line drawn on the model stay on the rock when the view moves?
@@ -16,7 +16,7 @@ The POC exists to answer four questions before the team commits to the pipeline,
 ### In scope
 
 - One real wall, one capture session, and one recapture if the first fails at the top
-- Two reconstruction pipelines run on the same photo set for comparison
+- One reconstruction with RealityScan
 - One cleaned, compressed model in GLB format with real-world scale
 - One web-based viewer with a constrained front-arc orbit, opened on a phone
 - One route line drawn on the model, labeled with a name and grade from OpenBeta
@@ -39,9 +39,9 @@ The POC exists to answer four questions before the team commits to the pipeline,
 
 ### Reconstruction
 
-- Two pipelines process the same photo set. Candidates are RealityScan (formerly RealityCapture), Meshroom, and COLMAP with OpenMVS. If no NVIDIA GPU is available, COLMAP with OpenMVS on CPU and one cloud service stand in
+- RealityScan processes the photo set on the team PC, which needs an NVIDIA GPU. See [ADR 0001](adr/0001-photogrammetry.md)
 - Processing time, hardware, triangle count, and texture resolution are recorded for each run
-- The better pipeline is rerun with the zoomed set added, to measure what it does for the top of the wall
+- RealityScan is rerun with the zoomed set added, to measure what it does for the top of the wall
 
 ### Model
 
@@ -70,20 +70,20 @@ The POC exists to answer four questions before the team commits to the pipeline,
 | Compressed GLB size | 50 MB or less |
 | Phone frame rate in the viewer | 30 fps or more |
 | Route line stays on the rock from five angles | Yes, no visible floating or sinking |
-| Processing time per pipeline | Recorded; informs the server decision |
+| Processing time | Recorded; informs the server decision |
 
 Legibility is scored by a climber who knows the wall, per route, on three points: start identifiable, line followable, finish identifiable.
 
 ## Exit criteria
 
-- **Go.** One pipeline meets the legibility target, the GLB fits the size budget, the phone holds frame rate, and the line stays on the rock. The team picks that pipeline, picks the platform, and starts the core app.
+- **Go.** The model meets the legibility target, the GLB fits the size budget, the phone holds frame rate, and the line stays on the rock. The team picks the platform and starts the core app.
 - **Partial.** Bottom and middle of the wall pass, top fails. One recapture with a denser zoomed pass or a higher vantage point. If the top still fails, lower the v1 wall height target or accept reduced top detail as a known limit.
-- **No-go.** Neither pipeline produces a legible model. Evaluate Gaussian splatting, or return to boulders as the first target.
+- **No-go.** RealityScan does not produce a legible model. Evaluate Gaussian splatting, or return to boulders as the first target.
 
 ## Deliverables
 
 1. Photo sets with capture notes
-2. Two raw reconstructions and one cleaned, compressed GLB
+2. One raw reconstruction and one cleaned, compressed GLB
 3. The viewer page with one labeled route, demonstrated on a phone
 4. A results file with the filled metrics table, screenshots, and the exit decision
 5. The OpenBeta query and its returned JSON for the wall
