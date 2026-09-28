@@ -20,12 +20,12 @@ A 3D climbing guide: photograph a climbing wall, get a 3D model you can move aro
 
 - **Climbing wall first.** v1 targets a single-pitch sport wall. A wall is captured from the ground in a front facing sweep, so the model is a relief of one face rather than a closed object, and the viewer lets the user move left, right, up, and down across a front arc of roughly 90 degrees rather than a full orbit. Walls under about 15 meters reconstruct best; above that the top loses detail because every photo is taken from far below. Boulders come later and are the easier case
 - **Capture: 60 to 150 photos per wall,** not a few. Walk parallel to the wall at two or three distances, shoot straight on and angled left and right, and add a pass from any higher ground nearby. Keep 60 to 80 percent overlap between neighboring shots and use one lens throughout so the pipeline sees consistent camera geometry. A zoomed pass of the upper wall is worth testing in the spike. Overcast light preferred so shadows do not bake into the texture. The capture screen counts photos and shows coverage along the wall
-- **Processing off the phone.** v1 pipeline: photos go to a team laptop and through an open-source or free reconstruction tool (COLMAP with OpenMVS, Meshroom, or RealityScan). The result is a textured mesh in GLB format, decimated and texture-compressed for download. On-device option to evaluate: Apple Object Capture's area mode on LiDAR iPhones, which is built for scenes rather than objects and may or may not handle a wall of this size
+- **Processing off the phone.** v1 pipeline: photos go to a team PC and through RealityScan (see [ADR 0001](docs/adr/0001-photogrammetry.md)). The result is a textured mesh in GLB format, decimated and texture-compressed for download. On-device option to evaluate: Apple Object Capture's area mode on LiDAR iPhones, which is built for scenes rather than objects and may or may not handle a wall of this size
 - **Viewer:** the platform's native 3D view (SceneKit or RealityKit on iOS, SceneView or Filament on Android), or a web viewer such as model-viewer or Three.js inside the app if that is faster to build. Camera constrained to the front arc so the user never ends up staring at the back of a one-sided mesh
 - **Route authoring:** the author draws a line on one source photo. Because the pipeline knows that photo's camera pose, the line projects onto the mesh and becomes a 3D polyline. Alternative: tap points directly on the model surface. The spike decides which
 - **Data model:** Crag -> Wall (photo set, mesh, camera poses, viewing arc) -> Route (OpenBeta id, name, grade, 3D line points)
 - **Test site:** one wall in Logan Canyon, used all year. The Practice Walls at the canyon mouth are the first candidate for roadside access. Capture in October before snow
-- **Two-week spike before anything else:** photograph the test wall, run the photos through two pipelines, and record processing time, output size, and whether holds are legible on the model. Check the top third of the wall specifically, since that is where a ground-level capture is weakest
+- **Two-week spike before anything else:** photograph the test wall, run the photos through RealityScan, and record processing time, output size, and whether holds are legible on the model. Check the top third of the wall specifically, since that is where a ground-level capture is weakest
 - **Bundle budget:** target 50 MB or less per wall after decimation and texture compression. Show size before download
 
 ## Assumptions
@@ -46,11 +46,11 @@ A 3D climbing guide: photograph a climbing wall, get a 3D model you can move aro
 - Route names and grades come from OpenBeta. Mountain Project is not an option
 - Route geometry cannot be pulled automatically. It must be drawn
 - Wall geometry comes from user photos. No existing source has it
+- Reconstruction uses RealityScan
 
 **Open**
 
-- Which reconstruction pipeline: COLMAP and OpenMVS, Meshroom, RealityScan, Apple Object Capture, or Gaussian splatting? The spike answers this
-- How long does one wall take to process on a laptop: minutes or hours?
+- How long does one wall take to process on the team PC: minutes or hours?
 - What is the minimum photo count for a model where holds are legible?
 - How legible is the top of a 15 meter wall from ground-level photos, and does a zoomed pass help?
 - How big is a wall model after compression, and does it fit the bundle budget?
