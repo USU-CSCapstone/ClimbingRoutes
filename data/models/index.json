@@ -1,0 +1,14 @@
+{
+  "models": [
+    {
+      "file": "wall47.glb",
+      "name": "Crag · 47 photos (sets 16 + 31)",
+      "notes": "1M triangles, two 8K textures"
+    },
+    {
+      "file": "crag16.glb",
+      "name": "Crag · 16 photos (run.reproject.ps1)",
+      "notes": "Script defaults: 300k triangles, one 8K texture"
+    }
+  ]
+}

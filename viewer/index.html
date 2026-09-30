@@ -12,6 +12,7 @@
   .panel { position: fixed; background: var(--panel); border-radius: 8px; padding: 10px 12px; backdrop-filter: blur(4px); }
   #stats { top: 12px; left: 12px; min-width: 220px; }
   #stats h1, #routePanel h2 { font-size: 14px; margin: 0 0 6px; }
+  #modelSelect { display: block; max-width: 100%; margin: 0 0 8px; padding: 3px 6px; font: 600 14px/1.4 system-ui, sans-serif; color: var(--text); background: #2a2d33; border: 1px solid #555; border-radius: 6px; cursor: pointer; }
   #stats table { border-collapse: collapse; }
   #stats td { padding: 1px 10px 1px 0; }
   #stats td:first-child { color: var(--muted); }
@@ -61,6 +62,7 @@
 <div id="status">Loading model…</div>
 <div id="stats" class="panel" hidden>
   <h1 id="modelName">Climbing wall model</h1>
+  <select id="modelSelect" aria-label="Model" hidden></select>
   <table id="statsTable"></table>
 </div>
 <div id="fps" class="panel">– fps</div>
@@ -103,10 +105,15 @@ import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
-// Models live in data/models/. Pick another with ?model=../data/models/<file>.glb
-const MODEL_URL = new URLSearchParams(location.search).get('model') || '../data/models/wall47.glb';
+// Models live in data/models/, listed for the dropdown in data/models/index.json. ?model=<file>.glb picks one.
+const MODELS = (await fetch('../data/models/index.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null))?.models || [];
+const modelParam = new URLSearchParams(location.search).get('model');
+const MODEL_URL = modelParam
+  ? (modelParam.includes('/') ? modelParam : '../data/models/' + modelParam)
+  : '../data/models/' + (MODELS[0]?.file || 'wall47.glb');
 const OPENBETA_URL = '../data/openbeta/date-wall.json';
 const MODEL_FILE = decodeURIComponent(MODEL_URL.split('/').pop());
+const modelInfo = MODELS.find((m) => m.file === MODEL_FILE);
 // Saved routes for data/models/<name>.glb live in data/routes/<name>.json (written by scripts/viewer/serve.mjs).
 const ROUTES_URL = '../data/routes/' + encodeURIComponent(MODEL_FILE.replace(/\.glb$/i, '')) + '.json';
 const ROUTE_COLORS = ['#ffd23f', '#3fd0ff', '#ff5ad1', '#ff8a3d', '#7dff5a', '#b58cff', '#ffffff', '#ff5a5a'];
@@ -230,8 +237,21 @@ new GLTFLoader().load(MODEL_URL, (gltf) => {
     row('Load + parse', (loadMs / 1000).toFixed(2) + ' s') +
     row('Bounding box', [size.x, size.y, size.z].map((v) => v.toFixed(1)).join(' × ') + ' (model units, unscaled)') +
     row('Captured face', `${(100 * face.kept / face.total).toFixed(0)}% of triangles`) +
-    row('GPU max texture', gl.getParameter(gl.MAX_TEXTURE_SIZE).toLocaleString() + ' px');
-  $('modelName').textContent = decodeURIComponent(MODEL_URL.split('/').pop());
+    row('GPU max texture', gl.getParameter(gl.MAX_TEXTURE_SIZE).toLocaleString() + ' px') +
+    (modelInfo?.notes ? row('Notes', escapeHtml(modelInfo.notes)) : '');
+  $('modelName').textContent = modelInfo?.name || MODEL_FILE;
+  if (MODELS.length > 1) {
+    const sel = $('modelSelect');
+    sel.innerHTML = MODELS.map((m) => `<option value="${escapeHtml(m.file)}">${escapeHtml(m.name || m.file)}</option>`).join('');
+    sel.value = MODEL_FILE;
+    sel.onchange = () => {
+      if (dirty && !confirm('This model has unsaved route changes. Switch models and lose them?')) { sel.value = MODEL_FILE; return; }
+      dirty = false;
+      location.search = '?model=' + encodeURIComponent(sel.value);
+    };
+    sel.hidden = false;
+    $('modelName').hidden = true;
+  }
   $('stats').hidden = false;
   statusEl.remove();
   initRoutes();
