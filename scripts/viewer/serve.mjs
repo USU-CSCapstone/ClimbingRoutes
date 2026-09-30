@@ -1,14 +1,18 @@
 // Serves the repo on http://localhost:8765/ so viewer/index.html can load the models in
 // data/models/ (browsers won't load them from file://). Localhost only; hidden paths such
-// as .git are refused. Run from anywhere: node scripts/viewer/serve.mjs [port]
+// as .git are refused. The one thing it writes is the viewer's saved route lines:
+// PUT /data/routes/<model>.json. Run from anywhere: node scripts/viewer/serve.mjs [port]
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
-import { extname, join, normalize, sep } from 'node:path';
+import { mkdir, rename, stat, writeFile } from 'node:fs/promises';
+import { dirname, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PORT = Number(process.argv[2] || process.env.PORT || 8765);
+const HOSTS = new Set([`localhost:${PORT}`, `127.0.0.1:${PORT}`]);
+const ROUTES_PATH = /^\/data\/routes\/[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
+const MAX_ROUTES_BYTES = 10 * 1024 * 1024;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -24,9 +28,57 @@ const TYPES = {
   '.svg': 'image/svg+xml',
 };
 
+const isVec3 = (a) => Array.isArray(a) && a.length === 3 && a.every(Number.isFinite);
+
+function checkRoutes(body) {
+  if (!body || typeof body !== 'object' || !Array.isArray(body.routes)) return 'expected an object with a routes array';
+  for (const r of body.routes) {
+    if (!r || typeof r.name !== 'string') return 'every route needs a name';
+    if (!Array.isArray(r.points) || !Array.isArray(r.normals) || r.points.length !== r.normals.length) {
+      return `route "${r.name}" needs matching points and normals arrays`;
+    }
+    if (!r.points.every(isVec3) || !r.normals.every(isVec3)) return `route "${r.name}" has a point that is not [x, y, z]`;
+  }
+  return null;
+}
+
+async function saveRoutes(req, res, path) {
+  const send = (code, text) => res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' }).end(text);
+  const origin = req.headers.origin;
+  if (origin && !HOSTS.has(origin.replace(/^http:\/\//, ''))) return send(403, 'only the viewer on this server may save routes');
+  if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(415, 'send the routes as application/json');
+
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_ROUTES_BYTES) return send(413, 'routes file is larger than 10 MB');
+    chunks.push(chunk);
+  }
+  let body;
+  try {
+    body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    return send(400, 'not valid JSON');
+  }
+  const problem = checkRoutes(body);
+  if (problem) return send(400, problem);
+
+  // Pretty-printed for readable diffs, with each [x, y, z] kept on one line.
+  const num = '(-?[\\d.]+(?:e[+-]?\\d+)?)';
+  const vec = new RegExp(`\\[\\s+${num},\\s+${num},\\s+${num}\\s+\\]`, 'g');
+  const text = JSON.stringify(body, null, 2).replace(vec, '[$1, $2, $3]') + '\n';
+  const file = join(ROOT, path);
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file + '.tmp', text);
+  await rename(file + '.tmp', file);
+  console.log(`saved ${body.routes.length} route(s) to ${path.slice(1)}`);
+  res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ saved: path.slice(1), routes: body.routes.length }));
+}
+
 const server = createServer(async (req, res) => {
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { Allow: 'GET, HEAD' }).end();
+  if (!HOSTS.has(req.headers.host)) {
+    res.writeHead(403).end();
     return;
   }
   let path;
@@ -34,6 +86,14 @@ const server = createServer(async (req, res) => {
     path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   } catch {
     res.writeHead(400).end();
+    return;
+  }
+  if (req.method === 'PUT' && ROUTES_PATH.test(path)) {
+    await saveRoutes(req, res, path).catch((err) => res.writeHead(500).end(String(err.message || err)));
+    return;
+  }
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { Allow: 'GET, HEAD, PUT' }).end();
     return;
   }
   if (path === '/') {

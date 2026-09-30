@@ -18,8 +18,24 @@
   #fps { top: 12px; right: 12px; font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; }
   #controls { bottom: 12px; left: 12px; }
   #controls label { cursor: pointer; }
-  #routePanel { top: 60px; right: 12px; width: 280px; }
-  #routePanel select { width: 100%; margin-bottom: 8px; font: inherit; }
+  #routePanel { top: 60px; right: 12px; width: 280px; max-height: calc(100vh - 150px); overflow-y: auto; }
+  #routeList { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+  #routeHeader { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  #routeHeader h2 { margin: 0; flex: 1; }
+  #routePanel button.mini { padding: 1px 7px; font-size: 12px; }
+  .route-row { display: flex; align-items: center; gap: 4px; padding-left: 6px; border: 1px solid transparent; border-radius: 6px; }
+  .route-row:hover, .route-row.active { background: #2a2d33; }
+  .route-row.active { border-color: var(--route); }
+  .route-row input { margin: 0; accent-color: var(--route); cursor: pointer; }
+  .route-row.off .rname, .route-row.off .rgrade, .route-row.off .rdot { opacity: 0.4; }
+  #routePanel button.route-pick { display: flex; align-items: center; gap: 8px; flex: 1; text-align: left; padding: 4px 8px 4px 4px; border: 0; background: transparent; }
+  .route-row .rdot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .route-row .rname { flex: 1; }
+  .route-row .rgrade { font-variant-numeric: tabular-nums; }
+  .route-row .rcount { color: var(--muted); font-size: 11px; min-width: 52px; text-align: right; }
+  #saveStatus { color: var(--muted); font-size: 12px; }
+  #saveStatus.dirty { color: #ffb44d; }
+  #saveStatus.error { color: #ff6b6b; }
   #routePanel .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
   #routePanel button { font: inherit; padding: 3px 9px; border-radius: 6px; border: 1px solid #555; background: #2a2d33; color: var(--text); cursor: pointer; }
   #routePanel button:hover { background: #353941; }
@@ -49,13 +65,20 @@
 </div>
 <div id="fps" class="panel">– fps</div>
 <div id="routePanel" class="panel" hidden>
-  <h2>Route (POC #13)</h2>
-  <select id="routeSelect" aria-label="Route name and grade"></select>
+  <div id="routeHeader">
+    <h2 id="routeArea">Routes</h2>
+    <button id="showAllBtn" class="mini" title="Show every route on the model">All</button>
+    <button id="hideAllBtn" class="mini" title="Hide every route on the model">None</button>
+  </div>
+  <div id="routeList" role="listbox" aria-label="Routes"></div>
   <div class="row">
-    <button id="drawBtn">Draw route</button>
+    <button id="drawBtn">Draw</button>
     <button id="undoBtn">Undo</button>
-    <button id="clearBtn">Clear</button>
-    <button id="copyBtn">Copy JSON</button>
+    <button id="clearBtn">Clear route</button>
+  </div>
+  <div class="row">
+    <button id="saveBtn">Save routes</button>
+    <span id="saveStatus"></span>
   </div>
   <div class="row"><label><input type="checkbox" id="straightChk"> Show straight segments too</label></div>
   <div class="row">Views:
@@ -77,15 +100,17 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 
-// Tap-to-place and draping cast thousands of rays at a 1M-triangle mesh, so use a BVH.
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
 // Models live in data/models/. Pick another with ?model=../data/models/<file>.glb
 const MODEL_URL = new URLSearchParams(location.search).get('model') || '../data/models/wall47.glb';
 const OPENBETA_URL = '../data/openbeta/date-wall.json';
-const STORE_KEY = 'route:' + MODEL_URL;
-const ROUTE_COLOR = 0xffd23f, STRAIGHT_COLOR = 0xff5a5a;
+const MODEL_FILE = decodeURIComponent(MODEL_URL.split('/').pop());
+// Saved routes for data/models/<name>.glb live in data/routes/<name>.json (written by scripts/viewer/serve.mjs).
+const ROUTES_URL = '../data/routes/' + encodeURIComponent(MODEL_FILE.replace(/\.glb$/i, '')) + '.json';
+const ROUTE_COLORS = ['#ffd23f', '#3fd0ff', '#ff5ad1', '#ff8a3d', '#7dff5a', '#b58cff', '#ffffff', '#ff5a5a'];
+const STRAIGHT_COLOR = 0xff5a5a;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -99,22 +124,18 @@ document.body.appendChild(labelRenderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1b1d21);
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.001, 1000);
-let controls = null;   // created after load, once camera.up is known
-let home = null;       // { az, pol, target, dist } of the straight-on view
-const targets = [];    // meshes a route can be drawn on
+let controls = null;   
+let home = null;
+const targets = [];
 const raycaster = new THREE.Raycaster();
 const lineMaterials = [];
-let edge = 0.05;       // typical triangle edge length; sets sample spacing and line offset
+let edge = 0.05;
 
 const statusEl = document.getElementById('status');
 const $ = (id) => document.getElementById(id);
 const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-// The mesh is closed off at the reconstruction-region walls with a few large
-// triangles, while the captured surface is many small ones. Average the normals
-// of triangles no bigger than 4x the median area to get the direction the
-// captured face points, and use their midpoints for its extent.
 function findCapturedFace(root) {
   root.updateMatrixWorld(true);
   const tri = new THREE.Triangle();
@@ -171,8 +192,6 @@ new GLTFLoader().load(MODEL_URL, (gltf) => {
   });
   scene.add(root);
 
-  // Look straight at the captured face from level ground, orbiting around +Y. The model must
-  // be leveled so that glTF's +Y really is up; then this works even for a wall that leans back.
   const face = findCapturedFace(root);
   edge = Math.sqrt(face.medianArea * 2.309);
   const center = face.box.getCenter(new THREE.Vector3());
@@ -225,24 +244,12 @@ new GLTFLoader().load(MODEL_URL, (gltf) => {
   window.__viewerError = String(err.message || err);
 });
 
-// ------------------------------------------------------------------ route tool
-const route = { points: [], normals: [], labelId: 'hypothetical' };
-let routeLabels = [{ id: 'hypothetical', name: 'Test route (hypothetical)', grade: '5.9' }];
+const routes = [];
+let active = null;
 let drawing = false;
-let draped = [];   // latest draped polyline, world space
-let lastStats = null;
-const routeGroup = new THREE.Group();
-scene.add(routeGroup);
+let dirty = false;
+let area = null;
 
-const labelInner = document.createElement('div');
-labelInner.className = 'route-label';
-const labelOuter = document.createElement('div');
-labelOuter.appendChild(labelInner);
-const label = new CSS2DObject(labelOuter);
-label.visible = false;
-scene.add(label);
-
-// Control points: screen-sized dots drawn on top so they stay grabbable from any angle.
 const dotMaterial = (() => {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
@@ -264,15 +271,33 @@ function makeLine(pts, color, width, dashed = false) {
   return line;
 }
 
-function clearRouteGroup() {
-  for (const o of [...routeGroup.children]) {
-    routeGroup.remove(o);
+function clearGroup(group) {
+  for (const o of [...group.children]) {
+    group.remove(o);
     if (o.isLine2) {
       o.geometry.dispose();
       o.material.dispose();
       lineMaterials.splice(lineMaterials.indexOf(o.material), 1);
     }
   }
+}
+
+function addRoute(info) {
+  const color = ROUTE_COLORS[routes.length % ROUTE_COLORS.length];
+  const group = new THREE.Group();
+  scene.add(group);
+  const labelInner = document.createElement('div');
+  labelInner.className = 'route-label';
+  labelInner.style.setProperty('--route', color);
+  labelInner.innerHTML = `${escapeHtml(info.name)}<span>${escapeHtml(info.grade)}</span>`;
+  const labelOuter = document.createElement('div');
+  labelOuter.appendChild(labelInner);
+  const label = new CSS2DObject(labelOuter);
+  label.visible = false;
+  scene.add(label);
+  const r = { ...info, color, shown: true, points: [], normals: [], draped: [], stats: null, group, label };
+  routes.push(r);
+  return r;
 }
 
 function pick(clientX, clientY) {
@@ -283,15 +308,10 @@ function pick(clientX, clientY) {
   const hit = raycaster.intersectObjects(targets, false)[0];
   if (!hit) return null;
   const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
-  if (n.dot(raycaster.ray.direction) > 0) n.negate();   // the side facing the camera
+  if (n.dot(raycaster.ray.direction) > 0) n.negate();
   return { p: hit.point.clone(), n };
 }
 
-// Straight segments between taps cut through bulges and hang over dips. Instead,
-// sample each segment about once per triangle edge and snap each sample onto the
-// surface along the interpolated normal, taking the hit nearest the chord (so
-// debris further out along the ray is ignored). Then lift everything by a small
-// offset so the line does not z-fight with the mesh.
 function drape(points, normals, offset) {
   const out = [], devs = [];
   let misses = 0;
@@ -305,14 +325,14 @@ function drape(points, normals, offset) {
       const t = s / steps;
       const S = a.clone().lerp(b, t);
       const N = na.clone().lerp(nb, t).normalize();
-      if (s === 0) { out.push(S.addScaledVector(N, offset)); devs.push(0); continue; }   // taps are already on the surface
+      if (s === 0) { out.push(S.addScaledVector(N, offset)); devs.push(0); continue; }
       raycaster.set(S.clone().addScaledVector(N, h), N.clone().negate());
       raycaster.far = 2 * h;
       const hits = raycaster.intersectObjects(targets, false);
       if (!hits.length) { out.push(S.addScaledVector(N, offset)); devs.push(NaN); misses++; continue; }
       let best = hits[0];
       for (const hit of hits) if (Math.abs(hit.distance - h) < Math.abs(best.distance - h)) best = hit;
-      devs.push(h - best.distance);   // > 0: the straight chord is inside the surface; < 0: it floats
+      devs.push(h - best.distance);
       const hn = best.face.normal.clone().transformDirection(best.object.matrixWorld);
       if (hn.dot(N) < 0) hn.negate();
       out.push(best.point.clone().addScaledVector(hn, offset));
@@ -328,103 +348,172 @@ function drape(points, normals, offset) {
   return { draped: out, devs, misses, samples: out.length, length, offset };
 }
 
-function rebuildRoute() {
-  clearRouteGroup();
-  const n = route.points.length;
+function rebuild(r) {
+  clearGroup(r.group);
+  const isActive = r === active;
   const offset = edge * 0.35;
-  for (const p of route.points) {
-    const dot = new THREE.Sprite(dotMaterial);
-    dot.scale.set(0.014, 0.014, 1);
-    dot.position.copy(p);
-    routeGroup.add(dot);
-  }
-  draped = [];
-  lastStats = null;
-  if (n >= 2) {
-    lastStats = drape(route.points, route.normals, offset);
-    draped = lastStats.draped;
-    routeGroup.add(makeLine(draped, ROUTE_COLOR, 4));
-    if ($('straightChk').checked) {
-      const lifted = route.points.map((p, i) => p.clone().addScaledVector(route.normals[i], offset));
-      routeGroup.add(makeLine(lifted, STRAIGHT_COLOR, 2.5, true));
+  if (isActive) {
+    for (const p of r.points) {
+      const dot = new THREE.Sprite(dotMaterial);
+      dot.scale.set(0.014, 0.014, 1);
+      dot.position.copy(p);
+      r.group.add(dot);
     }
   }
-  const info = routeLabels.find((r) => r.id === route.labelId) || routeLabels[0];
-  labelInner.innerHTML = `${escapeHtml(info.name)}<span>${escapeHtml(info.grade)}</span>`;
-  label.visible = n > 0;
-  if (n > 0) label.position.copy(route.points[0]);
-  updateStatus();
+  r.draped = [];
+  r.stats = null;
+  if (r.points.length >= 2) {
+    r.stats = drape(r.points, r.normals, offset);
+    r.draped = r.stats.draped;
+    r.group.add(makeLine(r.draped, new THREE.Color(r.color), isActive ? 5 : 3.5));
+    if (isActive && $('straightChk').checked) {
+      const lifted = r.points.map((p, i) => p.clone().addScaledVector(r.normals[i], offset));
+      r.group.add(makeLine(lifted, STRAIGHT_COLOR, 2.5, true));
+    }
+  }
+  r.group.visible = r.shown;
+  r.label.visible = r.shown && r.points.length > 0;
+  if (r.points.length) r.label.position.copy(r.points[0]);
+  if (isActive) updateStatus();
+  renderList();
+}
+
+function renderList() {
+  $('routeList').innerHTML = routes.map((r, i) =>
+    `<div class="route-row${r === active ? ' active' : ''}${r.shown ? '' : ' off'}" style="--route:${r.color}">` +
+    `<input type="checkbox" data-i="${i}"${r.shown ? ' checked' : ''} aria-label="Show ${escapeHtml(r.name)} on the model">` +
+    `<button class="route-pick" data-i="${i}" role="option" aria-selected="${r === active}">` +
+    `<span class="rdot" style="background:${r.color}"></span><span class="rname">${escapeHtml(r.name)}</span>` +
+    `<span class="rgrade">${escapeHtml(r.grade)}</span>` +
+    `<span class="rcount">${r.points.length ? `${r.points.length} pts` : 'not drawn'}</span></button></div>`).join('');
+  for (const b of $('routeList').querySelectorAll('.route-pick')) b.onclick = () => setActive(routes[+b.dataset.i]);
+  for (const c of $('routeList').querySelectorAll('input')) c.onchange = () => setShown([routes[+c.dataset.i]], c.checked);
+}
+
+const SHOWN_KEY = 'hiddenRoutes:' + MODEL_FILE;
+function setShown(list, on) {
+  for (const r of list) {
+    r.shown = on;
+    r.group.visible = on;
+    r.label.visible = on && r.points.length > 0;
+  }
+  try { localStorage.setItem(SHOWN_KEY, JSON.stringify(routes.filter((r) => !r.shown).map((r) => r.id))); } catch (e) {}
+  renderList();
+}
+
+function loadShown() {
+  try {
+    const hidden = new Set(JSON.parse(localStorage.getItem(SHOWN_KEY) || '[]'));
+    for (const r of routes) r.shown = !hidden.has(r.id);
+  } catch (e) {}
+}
+
+function setActive(r, reveal = true) {
+  if (reveal && !r.shown) setShown([r], true);
+  const prev = active;
+  active = r;
+  $('routePanel').style.setProperty('--route', r.color);
+  if (prev && prev !== r) rebuild(prev);
+  rebuild(r);
 }
 
 const pct = (a, b) => `${Math.round(100 * a / Math.max(b, 1))}%`;
 function updateStatus() {
-  const n = route.points.length, el = $('routeStatus');
-  if (!n) { el.innerHTML = 'Click <b>Draw route</b>, then click holds on the wall from the start upward. Esc stops drawing; Ctrl+Z undoes a point.'; return; }
-  if (n < 2) { el.innerHTML = '<b>1 point.</b> Click the next hold.'; return; }
-  const d = lastStats, valid = d.devs.filter(Number.isFinite), abs = valid.map(Math.abs);
+  const r = active, n = r.points.length, el = $('routeStatus');
+  const name = `<b>${escapeHtml(r.name)}</b>`;
+  if (!n) { el.innerHTML = `${name}: click <b>Draw</b>, then click holds on the wall from the start upward. Esc stops drawing; Ctrl+Z undoes a point.`; return; }
+  if (n < 2) { el.innerHTML = `${name}: 1 point. Click the next hold.`; return; }
+  const d = r.stats, valid = d.devs.filter(Number.isFinite), abs = valid.map(Math.abs);
   const tol = d.offset * 3;
   const floats = valid.filter((v) => v < -tol).length, sinks = valid.filter((v) => v > tol).length;
   el.innerHTML =
-    `<b>${n} points</b>, ${d.length.toFixed(2)} units long, draped over ${d.samples} surface samples` +
+    `${name}: ${n} points, ${d.length.toFixed(2)} units long, draped over ${d.samples} surface samples` +
     (d.misses ? `, <b>${d.misses} over holes</b>` : '') + '.<br>' +
     `<span class="swatch" style="background:#ff5a5a"></span>Straight segments would stray up to <b>${Math.max(...abs).toFixed(2)}</b> units ` +
-    `(mean ${(abs.reduce((s, v) => s + v, 0) / abs.length).toFixed(3)}): ${pct(floats, valid.length)} floating, ${pct(sinks, valid.length)} sunk in.<br>` +
-    `<span class="swatch" style="background:#ffd23f"></span>Draped line: ${d.offset.toFixed(3)} units off the surface wherever it hit.`;
+    `(mean ${(abs.reduce((s, v) => s + v, 0) / abs.length).toFixed(3)}): ${pct(floats, valid.length)} floating, ${pct(sinks, valid.length)} sunk in.`;
 }
 
-function saveRoute() {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify({ labelId: route.labelId, points: route.points.map((p) => p.toArray()), normals: route.normals.map((v) => v.toArray()) }));
-  } catch (e) { /* storage unavailable; the route just won't survive a reload */ }
+function setDirty(on) {
+  dirty = on;
+  const el = $('saveStatus');
+  el.className = on ? 'dirty' : '';
+  if (on) el.textContent = 'Unsaved changes';
 }
 
-function loadSavedRoute() {
-  try {
-    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if (s && Array.isArray(s.points) && s.points.length === s.normals.length) {
-      route.points = s.points.map((a) => new THREE.Vector3(...a));
-      route.normals = s.normals.map((a) => new THREE.Vector3(...a));
-      route.labelId = s.labelId || route.labelId;
-    }
-  } catch (e) { /* ignore unreadable storage */ }
-}
-
-function routeJSON() {
-  const info = routeLabels.find((r) => r.id === route.labelId) || routeLabels[0];
+function routesJSON() {
   const r4 = (v) => v.toArray().map((x) => +x.toFixed(4));
   return {
-    model: MODEL_URL,
-    openbeta_uuid: info.id === 'hypothetical' ? null : info.id,
-    name: info.name,
-    grade: info.grade,
-    points: route.points.map(r4),
-    normals: route.normals.map(r4),
+    model: 'data/models/' + MODEL_FILE,
+    area: area ? { name: area.area_name, openbeta_uuid: area.uuid } : null,
+    updated: new Date().toISOString(),
+    routes: routes.filter((r) => r.points.length).map((r) => ({
+      openbeta_uuid: r.id,
+      name: r.name,
+      grade: r.grade,
+      points: r.points.map(r4),
+      normals: r.normals.map(r4),
+    })),
   };
+}
+
+async function saveRoutes() {
+  const el = $('saveStatus');
+  $('saveBtn').disabled = true;
+  try {
+    const res = await fetch(ROUTES_URL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(routesJSON()) });
+    if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+    setDirty(false);
+    el.textContent = `Saved ${new Date().toLocaleTimeString()} to data/routes/${decodeURIComponent(ROUTES_URL.split('/').pop())}`;
+  } catch (e) {
+    el.className = 'error';
+    el.textContent = `Save failed: ${e.message}. Is scripts/viewer/serve.mjs running?`;
+  } finally {
+    $('saveBtn').disabled = false;
+  }
+}
+
+async function loadRoutes() {
+  const el = $('saveStatus');
+  try {
+    const res = await fetch(ROUTES_URL, { cache: 'no-store' });
+    if (res.status === 404) { el.textContent = 'No saved routes yet'; return; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const saved = await res.json();
+    for (const s of saved.routes || []) {
+      const r = routes.find((x) => x.id === s.openbeta_uuid) || addRoute({ id: s.openbeta_uuid, name: s.name, grade: s.grade });
+      r.points = s.points.map((a) => new THREE.Vector3(...a));
+      r.normals = s.normals.map((a) => new THREE.Vector3(...a));
+    }
+    el.textContent = `Loaded ${(saved.routes || []).length} saved route(s)`;
+  } catch (e) {
+    el.className = 'error';
+    el.textContent = `Could not load saved routes: ${e.message}`;
+  }
 }
 
 function setDrawing(on) {
   drawing = on;
   $('drawBtn').classList.toggle('on', on);
-  $('drawBtn').textContent = on ? 'Drawing… (Esc)' : 'Draw route';
+  $('drawBtn').textContent = on ? 'Drawing… (Esc)' : 'Draw';
   document.body.classList.toggle('drawing', on);
 }
 
 function undo() {
-  if (!route.points.length) return;
-  route.points.pop();
-  route.normals.pop();
-  rebuildRoute();
-  saveRoute();
+  if (!active || !active.points.length) return;
+  active.points.pop();
+  active.normals.pop();
+  rebuild(active);
+  setDirty(true);
 }
 
 function routeFrame() {
+  const draped = active ? active.draped : [];
   if (draped.length < 2) return { target: home.target, dist: home.dist };
   const box = new THREE.Box3().setFromPoints(draped);
   const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, edge * 40);
   return { target: box.getCenter(new THREE.Vector3()), dist: (r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.25 };
 }
 
-// Views relative to the straight-on direction, framed on the route (the five-angle check).
 function setView(azDeg, elDeg) {
   const frame = routeFrame();
   const toYUp = new THREE.Quaternion().setFromUnitVectors(camera.up, new THREE.Vector3(0, 1, 0));
@@ -437,57 +526,61 @@ function setView(azDeg, elDeg) {
 
 async function initRoutes() {
   try {
-    const j = await (await fetch(OPENBETA_URL)).json();
-    const area = j.data.area;
+    area = (await (await fetch(OPENBETA_URL)).json()).data.area;
+    $('routeArea').textContent = `Routes · ${area.area_name} (OpenBeta)`;
     const climbs = area.climbs.slice().sort((a, b) => (a.metadata?.leftRightIndex ?? 0) - (b.metadata?.leftRightIndex ?? 0));
-    routeLabels = routeLabels.concat(climbs.map((c) => ({ id: c.uuid, name: c.name, grade: c.grades?.yds || '?', area: area.area_name })));
-  } catch (e) { /* no OpenBeta file next to the viewer; keep the hypothetical label */ }
-  $('routeSelect').innerHTML = routeLabels.map((r) =>
-    `<option value="${r.id}">${escapeHtml(r.name)} · ${escapeHtml(r.grade)}${r.area ? ` (OpenBeta: ${escapeHtml(r.area)})` : ''}</option>`).join('');
-  loadSavedRoute();
-  $('routeSelect').value = route.labelId;
+    for (const c of climbs) addRoute({ id: c.uuid, name: c.name, grade: c.grades?.yds || '?' });
+  } catch (e) {
+    $('routeArea').textContent = 'Routes (OpenBeta data not found)';
+  }
+  await loadRoutes();
   $('routePanel').hidden = false;
+  if (!routes.length) { $('routeStatus').textContent = `No routes to draw: ${OPENBETA_URL} did not load.`; return; }
 
-  $('routeSelect').onchange = () => { route.labelId = $('routeSelect').value; rebuildRoute(); saveRoute(); };
   $('drawBtn').onclick = () => setDrawing(!drawing);
   $('undoBtn').onclick = undo;
-  $('clearBtn').onclick = () => { route.points = []; route.normals = []; rebuildRoute(); saveRoute(); };
-  $('straightChk').onchange = rebuildRoute;
-  $('copyBtn').onclick = async () => {
-    const text = JSON.stringify(routeJSON(), null, 2);
-    try { await navigator.clipboard.writeText(text); $('copyBtn').textContent = 'Copied'; }
-    catch (e) { console.log(text); $('copyBtn').textContent = 'See console'; }
-    setTimeout(() => { $('copyBtn').textContent = 'Copy JSON'; }, 1500);
+  $('clearBtn').onclick = () => {
+    if (!active.points.length || !confirm(`Clear the line for ${active.name}?`)) return;
+    active.points = []; active.normals = [];
+    rebuild(active);
+    setDirty(true);
   };
+  $('saveBtn').onclick = saveRoutes;
+  $('straightChk').onchange = () => rebuild(active);
   for (const b of document.querySelectorAll('[data-view]')) {
     b.onclick = () => { const [az, el] = b.dataset.view.split(',').map(Number); setView(az, el); };
   }
 
-  // A click (little movement, short press) places a point; a drag still orbits.
   let down = null;
   renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now(), button: e.button }; });
   renderer.domElement.addEventListener('pointerup', (e) => {
     const d = down;
     down = null;
-    if (!drawing || !d || d.button !== 0) return;
+    if (!drawing || !active || !d || d.button !== 0) return;
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6 || performance.now() - d.t > 600) return;
     const hit = pick(e.clientX, e.clientY);
     if (!hit) { $('routeStatus').innerHTML = '<b>Missed the model.</b> Click on the wall.'; return; }
-    route.points.push(hit.p);
-    route.normals.push(hit.n);
-    rebuildRoute();
-    saveRoute();
+    if (!active.shown) setShown([active], true);
+    active.points.push(hit.p);
+    active.normals.push(hit.n);
+    rebuild(active);
+    setDirty(true);
   });
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && drawing) setDrawing(false);
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   });
+  addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
-  rebuildRoute();
-  window.routeTool = { route, routeJSON, get draped() { return draped; }, get stats() { return lastStats; }, setView };
+  $('showAllBtn').onclick = () => setShown(routes, true);
+  $('hideAllBtn').onclick = () => setShown(routes, false);
+
+  loadShown();
+  for (const r of routes) rebuild(r);
+  setActive(routes.find((r) => r.shown) || routes[0], false);
+  window.routeTool = { routes, get active() { return active; }, setActive, setShown, routesJSON, saveRoutes, setView, get dirty() { return dirty; } };
 }
 
-// Frame-rate readout, averaged over half-second windows.
 const fpsEl = $('fps');
 let frames = 0, last = performance.now();
 renderer.setAnimationLoop(() => {
