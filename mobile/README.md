@@ -22,6 +22,16 @@ npx tsc --noEmit
 npx expo lint
 ```
 
+## Drawing routes
+
+The author tool at `/author` draws route lines on a wall's model and saves them to `data/routes/`. It only exists in development, in a desktop browser. It reads and saves through a small server for the repo's `data/` folder, so run that too, from the repo root:
+
+```
+node scripts/viewer/serve.mjs
+```
+
+Then open http://localhost:8081/author. `?model=crag16.glb` picks a model from `data/models/index.json`. Pick a route, click **Draw**, and click holds from the start upward. **Save routes** writes `data/routes/<model>.json`; commit that file to share the lines.
+
 ## Layout
 
 - `src/app/` screens and navigation (Expo Router). Explore and Search share the area and route pages through the `(explore,search)` group
@@ -29,6 +39,7 @@ npx expo lint
 - `src/data/` React Query hooks and caching
 - `src/ui/` shared components
 - `src/viewer/` the 3D wall viewer, on three.js. It needs a browser, so screens show it through the `wall-viewer.tsx` DOM component, which runs in a webview on iOS and Android
+- `src/author/` the route author tool behind `/author`, built on the viewer
 
 ## Data
 

@@ -16,7 +16,7 @@ import type { Uuid } from '@/core/types';
 import { drape, findCapturedFace, typicalEdge } from '@/viewer/geometry';
 import type { DrapeStats, ModelInfo, SurfaceHit, Viewer, ViewerOptions, ViewerRoute } from '@/viewer/types';
 
-const ROUTE_COLORS = ['#ffd23f', '#3fd0ff', '#ff5ad1', '#ff8a3d', '#7dff5a', '#b58cff', '#ffffff', '#ff5a5a'];
+export const ROUTE_COLORS = ['#ffd23f', '#3fd0ff', '#ff5ad1', '#ff8a3d', '#7dff5a', '#b58cff', '#ffffff', '#ff5a5a'];
 const STRAIGHT_COLOR = '#ff5a5a';
 const BACKGROUND = '#1b1d21';
 /** Opacity of the other routes while one is highlighted. */
@@ -274,7 +274,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     clearGroup(state.group);
     const { points, normals } = state.route;
     const isHighlighted = state.route.uuid === highlighted;
-    const opacity = highlighted && !isHighlighted ? DIMMED : 1;
+    const opacity = highlighted && !isHighlighted && (options.dimOthers ?? true) ? DIMMED : 1;
     if (isHighlighted && overlays.points) {
       for (const p of points) {
         const dot = new THREE.Sprite(dotMaterial);

@@ -68,6 +68,8 @@ export interface ViewerOptions {
   routes?: ViewerRoute[];
   /** Keep the camera in front of the wall. Defaults to true. */
   frontArc?: boolean;
+  /** Dim the other routes while one is highlighted. Defaults to true. */
+  dimOthers?: boolean;
   /** CSS color behind the model. */
   background?: string;
   onProgress?: (fraction: number) => void;
@@ -84,7 +86,7 @@ export interface ViewerOptions {
 export interface Viewer {
   /** Replaces the routes. Lines whose points haven't changed are not draped again. */
   setRoutes(routes: ViewerRoute[]): void;
-  /** Thickens one route's line and dims the rest. Null shows them all evenly. */
+  /** Thickens one route's line and, unless dimOthers is off, dims the rest. Null shows them all evenly. */
   highlight(uuid: Uuid | null): void;
   setFrontArc(on: boolean): void;
   /**
