@@ -28,6 +28,7 @@ npx expo lint
 - `src/core/` types, OpenBeta client, search, grades. No React imports, so Node scripts can reuse it (enforced by lint)
 - `src/data/` React Query hooks and caching
 - `src/ui/` shared components
+- `src/viewer/` the 3D wall viewer, on three.js. It needs a browser, so screens show it through the `wall-viewer.tsx` DOM component, which runs in a webview on iOS and Android
 
 ## Data
 
