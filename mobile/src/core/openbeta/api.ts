@@ -9,8 +9,9 @@ import type {
   Discipline,
   GradeSystem,
   LatLng,
+  MapArea,
+  MapNode,
   Uuid,
-  WallLocation,
 } from '../types';
 import { gql } from './graphql';
 
@@ -92,30 +93,49 @@ query Climb($uuid: ID) {
   }
 }`;
 
-const WALLS_QUERY = `
-query Walls($path: [String]!) {
-  areas(filter: { path_tokens: { tokens: $path, exactMatch: false }, leaf_status: { isLeaf: true } }) {
-    uuid area_name totalClimbs
-    metadata { lat lng }
+// Nested areas come back with no bbox, so each area's bbox is read from its own query.
+const MAP_AREA_QUERY = `
+query MapArea($uuid: ID) {
+  area(uuid: $uuid) {
+    uuid
+    metadata { bbox }
+    children { uuid area_name totalClimbs metadata { leaf lat lng } }
   }
 }`;
 
-interface ObWall {
+interface ObMapArea {
   uuid: string;
-  area_name: string;
-  totalClimbs: number | null;
-  metadata: { lat: number | null; lng: number | null } | null;
+  metadata: { bbox: number[] | null } | null;
+  children: {
+    uuid: string;
+    area_name: string;
+    totalClimbs: number | null;
+    metadata: { leaf: boolean | null; lat: number | null; lng: number | null } | null;
+  }[];
 }
 
-/** Every wall under the area at `path`, skipping walls with no coordinates. */
-export async function fetchWalls(path: string[], signal?: AbortSignal): Promise<WallLocation[]> {
-  const { areas } = await gql<{ areas: ObWall[] }>(WALLS_QUERY, { path }, signal);
-  const walls: WallLocation[] = [];
-  for (const a of areas) {
-    const location = toLatLng(a.metadata?.lat, a.metadata?.lng);
-    if (location) walls.push({ uuid: a.uuid, name: a.area_name, totalClimbs: a.totalClimbs ?? 0, location });
+/** An area's children as map dots, skipping ones with no coordinates or no routes. */
+export async function fetchMapArea(uuid: Uuid, signal?: AbortSignal): Promise<MapArea | null> {
+  const { area } = await gql<{ area: ObMapArea | null }>(MAP_AREA_QUERY, { uuid }, signal);
+  if (!area) return null;
+  const children: MapNode[] = [];
+  for (const c of area.children) {
+    const location = toLatLng(c.metadata?.lat, c.metadata?.lng);
+    if (!location || !c.totalClimbs) continue;
+    children.push({
+      uuid: c.uuid,
+      name: c.area_name,
+      totalClimbs: c.totalClimbs,
+      isLeaf: c.metadata?.leaf ?? false,
+      location,
+    });
   }
-  return walls.sort((a, b) => a.name.localeCompare(b.name));
+  const bbox = area.metadata?.bbox;
+  return {
+    uuid: area.uuid,
+    bbox: bbox?.length === 4 ? [bbox[0], bbox[1], bbox[2], bbox[3]] : null,
+    children,
+  };
 }
 
 export async function fetchArea(uuid: Uuid, signal?: AbortSignal): Promise<Area | null> {

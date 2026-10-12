@@ -1,6 +1,5 @@
 import { Stack } from 'expo-router';
 
-import { MAP_AREA } from '@/core/config';
 import { useTheme } from '@/hooks/use-theme';
 
 // Explore, Map and Search each get their own stack, sharing the area and climb pages.
@@ -22,7 +21,7 @@ export default function SharedLayout({ segment }: { segment: string }) {
       {segment === '(search)' ? (
         <Stack.Screen name="search" options={{ title: 'Search', headerShown: false }} />
       ) : segment === '(map)' ? (
-        <Stack.Screen name="map" options={{ title: MAP_AREA.name }} />
+        <Stack.Screen name="map" options={{ title: 'Map' }} />
       ) : (
         <Stack.Screen name="explore" options={{ title: 'Explore' }} />
       )}

@@ -2,41 +2,45 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import type { Uuid } from '@/core/types';
-import { useMapWalls } from '@/data/queries';
+import type { MapView } from '@/core/map';
+import type { BBox, Uuid } from '@/core/types';
+import { useMapDots } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { climbCount, LinkRow, Loading, Message } from '@/ui/components';
+import { climbCount, LinkRow, Message } from '@/ui/components';
 import { useHrefs } from '@/ui/nav';
 import WallMap from '@/ui/wall-map';
 
+/** The lower 48 states. */
+const USA_BOUNDS: BBox = [-125, 24, -66, 50];
+
 export default function MapScreen() {
-  const { data: walls, isPending, error } = useMapWalls();
+  // Replaced by the real view as soon as the map loads.
+  const [view, setView] = useState<MapView>({ bbox: USA_BOUNDS, zoom: 3, width: 1, height: 1 });
   const [selected, setSelected] = useState<Uuid | null>(null);
+  const { dots, error } = useMapDots(view);
   const hrefs = useHrefs();
   const theme = useTheme();
 
-  if (isPending) return <Loading />;
   if (error) return <Message title="Couldn't load the map" detail={error.message} />;
-  if (walls.length === 0) return <Message title="No walls to show" detail="OpenBeta has no wall locations here." />;
 
-  const wall = walls.find((w) => w.uuid === selected);
+  // Zooming can fold the selected wall into its area, which closes the card.
+  const dot = dots.find((d) => d.uuid === selected);
+  const details = [climbCount(dot?.totalClimbs ?? 0), dot?.hasModel ? '3D model' : null];
 
   return (
     <View style={styles.screen}>
       <WallMap
-        walls={walls}
+        initialBounds={USA_BOUNDS}
+        dots={dots}
         selected={selected}
         onSelect={async (uuid) => setSelected(uuid)}
+        onViewChange={async (v) => setView(v)}
         dom={{ style: styles.screen, scrollEnabled: false, bounces: false }}
       />
-      {/* The selected wall shows in a card at the bottom, within thumb reach, above the map credits. */}
-      {wall ? (
+      {/* The selected dot shows in a card at the bottom, within thumb reach, above the map credits. */}
+      {dot ? (
         <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.border }]}>
-          <LinkRow
-            href={hrefs.area(wall.uuid)}
-            title={wall.name}
-            subtitle={wall.hasModel ? `${climbCount(wall.totalClimbs)} · 3D model` : climbCount(wall.totalClimbs)}
-          />
+          <LinkRow href={hrefs.area(dot.uuid)} title={dot.name} subtitle={details.filter(Boolean).join(' · ')} />
         </View>
       ) : null}
     </View>

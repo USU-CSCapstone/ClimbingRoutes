@@ -32,7 +32,7 @@ npx expo lint
 ## Data
 
 - **Area and route pages:** OpenBeta GraphQL at `api.openbeta.io`, looked up by uuid
-- **Map:** every wall under Logan Canyon from one GraphQL `areas` query, drawn with MapLibre on OpenFreeMap tiles. The map is a DOM component (`src/ui/wall-map.tsx`), so it runs in a WebView on phones and works in Expo Go
+- **Map:** starts with one dot per state. Zooming in splits an area into its children once they have room on screen, down to single walls (`src/core/map.ts`). Each area loads by uuid the first time the view reaches it. Drawn with MapLibre on OpenFreeMap tiles. The map is a DOM component (`src/ui/wall-map.tsx`), so it runs in a WebView on phones and works in Expo Go
 - **Search:** openbeta.io's Typesense server, using the read-only key from their public website code. It isn't a documented API and the key could change. If it fails, search falls back to GraphQL area search, which can't find routes
 - **Caching:** responses are cached in memory for a day. Nothing is stored on the device yet
 - **License:** OpenBeta data is CC0. The route page credits OpenBeta

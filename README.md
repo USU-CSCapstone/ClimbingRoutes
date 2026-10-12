@@ -12,7 +12,7 @@ USU Computer Science capstone project.
 
 - Search routes and areas by name
 - Browse the USA from state to area to wall
-- Map of Logan Canyon walls, with walls that have a 3D model marked
+- Map of the USA that groups walls into their areas when zoomed out, with walls that have a 3D model marked
 - Route pages with grade, type, length, bolts, description and first ascent when OpenBeta has them
 
 **Planned**
