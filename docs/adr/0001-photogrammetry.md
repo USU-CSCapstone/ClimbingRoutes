@@ -9,7 +9,7 @@ v1 turns a set of ground-level phone photos of a wall into a textured GLB, proce
 
 Options considered:
 
-- **RealityScan** Fast, high-quality meshes and textures, free for small teams. Desktop app is Windows-only and needs an NVIDIA GPU.
+- **RealityScan.** Fast, high-quality meshes and textures, free for small teams. Desktop app is Windows-only and needs an NVIDIA GPU.
 - **COLMAP with OpenMVS.** Open source and runs on CPU, but slower and takes more setup.
 - **Meshroom.** Open source with a GUI, but also needs an NVIDIA GPU and is slower.
 - **Apple Object Capture (area mode).** On-device on LiDAR iPhones, but unproven at wall scale.
@@ -24,4 +24,4 @@ Use RealityScan as the v1 reconstruction pipeline.
 ## Consequences
 
 - Processing needs a specific machine; without one, fall back to COLMAP with OpenMVS
-- Closed source, so the pipeline can't be scripted or changed beyond what RealityScan exposes
+- Closed source. Runs can be scripted through its command line (`scripts/realityscan/`), but the pipeline can't be changed beyond what RealityScan exposes

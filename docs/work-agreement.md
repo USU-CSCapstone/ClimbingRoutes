@@ -1,21 +1,21 @@
-10/5/2026
+# Work Agreement
 
-Follow scrum workflow
-3x a week standups
-Document work in tickets
+Agreed 2026-10-05.
 
-Code reviews:
-View all files
-Test code changes
-Claude to summarize
+## Process
 
-Extensive PR’s:
-Good descriptions
-Ask questions about what is in the pr if not descriptive enough
-Communicate about new pr’s in slack
+- Follow a Scrum workflow, with standups three times a week
+- Plan in one-week milestones. The number and type of tasks depend on the milestone
+- Track work in tickets on the Kanban board, and give each milestone a summary task for documentation
 
-Ticket Planning: 
-1 week sectioned milestones
-Amount of tasks and type of tasks depend on milestones
-Summary task for documentation
-Kanban board
+## Pull requests
+
+- Write a clear description of what changed and why
+- Announce new PRs in Slack
+- If a description isn't clear enough, ask questions on the PR
+
+## Code review
+
+- Look at every changed file
+- Test the changes yourself
+- Use Claude to summarize the PR
