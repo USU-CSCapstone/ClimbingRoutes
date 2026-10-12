@@ -5,13 +5,13 @@ ClimbingRoutes is a climbing guide app for outdoor climbers. It's built in two p
 1. **A climbing guide.** Search, browse and read route information from OpenBeta, on iOS, Android and web
 2. **3D walls.** Photogrammetry models of real walls with each route drawn on the rock
 
-Phase 1 is the current focus. Phase 2 has a working proof of concept (see [poc-plan.md](poc-plan.md)).
+There are two main parts to the project. Part 1 is climbing app with data/guide. Part 2 is the 3d models, and the viewer.
 
 ## Users
 
 Outdoor climbers, starting with single-pitch sport climbers. Boulderers come later.
 
-## Phase 1: climbing guide
+## Part 1: climbing guide
 
 ### Must have
 
@@ -29,7 +29,7 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 - **Offline:** download an area and use it with no signal. iOS and Android only; the web version stays online
 - Nearby crags and a map, using OpenBeta coordinates
 
-## Phase 2: 3D walls
+## Part 2: 3D walls
 
 - A wall with a model can be opened fullscreen from its wall page or any of its route pages
 - Routes are drawn as lines on the rock, numbered to match the route list
