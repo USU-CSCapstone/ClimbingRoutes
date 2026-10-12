@@ -11,7 +11,7 @@ export interface WallViewerProps {
   /** URL of the wall's GLB. */
   model: string;
   routes: ViewerRoute[];
-  /** Route to highlight. The others dim. */
+  /** Route to highlight. The others dim and the camera flies to it. */
   highlighted?: Uuid | null;
   /** Keep the camera in front of the wall. Defaults to true. */
   frontArc?: boolean;
@@ -19,6 +19,7 @@ export interface WallViewerProps {
   onLoad?: (info: ModelInfo) => void;
   onError?: (message: string) => void;
   onRouteTap?: (uuid: Uuid) => void;
+  onEmptyTap?: () => void;
   onFps?: (fps: number) => void;
   dom?: DOMProps;
 }
@@ -37,6 +38,7 @@ export default function WallViewer({
   onLoad,
   onError,
   onRouteTap,
+  onEmptyTap,
   onFps,
 }: WallViewerProps) {
   const container = useRef<HTMLDivElement>(null);
@@ -47,6 +49,7 @@ export default function WallViewer({
   const loaded = useEffectEvent((info: ModelInfo) => onLoad?.(info));
   const failed = useEffectEvent((message: string) => onError?.(message));
   const tapped = useEffectEvent((uuid: Uuid) => onRouteTap?.(uuid));
+  const missed = useEffectEvent(() => onEmptyTap?.());
   const measured = useEffectEvent((fps: number) => onFps?.(fps));
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export default function WallViewer({
       onLoad: (info) => loaded(info),
       onError: (error) => failed(error.message),
       onRouteTap: (uuid) => tapped(uuid),
+      onEmptyTap: () => missed(),
       onFps: (fps) => measured(fps),
     });
     viewer.current = v;
@@ -67,7 +71,10 @@ export default function WallViewer({
   }, [model]);
 
   useEffect(() => viewer.current?.setRoutes(routes), [model, routes]);
-  useEffect(() => viewer.current?.highlight(highlighted), [model, highlighted]);
+  useEffect(() => {
+    viewer.current?.highlight(highlighted);
+    if (highlighted) viewer.current?.focus(highlighted);
+  }, [model, highlighted]);
   useEffect(() => viewer.current?.setFrontArc(frontArc), [model, frontArc]);
 
   return <div ref={container} style={{ position: 'absolute', inset: 0 }} />;

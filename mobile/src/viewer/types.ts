@@ -77,6 +77,8 @@ export interface ViewerOptions {
   onError?: (error: Error) => void;
   /** A tap landed on a route's line or label. */
   onRouteTap?: (uuid: Uuid) => void;
+  /** A tap on the model or background missed every route. */
+  onEmptyTap?: () => void;
   /** Every tap on the model, with the surface under it, or null if it missed the wall. */
   onSurfaceTap?: (hit: SurfaceHit | null) => void;
   /** Frame rate, reported twice a second. */
@@ -94,6 +96,12 @@ export interface Viewer {
    * the highlighted route or, with none, the whole wall.
    */
   setView(azimuthDeg: number, elevationDeg: number): void;
+  /**
+   * Flies the camera to frame a route from straight in front, or with null
+   * the whole wall. Waits for the model and the route's line if they haven't
+   * loaded yet. Dragging or zooming stops the flight.
+   */
+  focus(uuid: Uuid | null): void;
   /**
    * Extra marks on the highlighted route for drawing it: a dot on each placed
    * point, and the straight segments between them as a dashed line.

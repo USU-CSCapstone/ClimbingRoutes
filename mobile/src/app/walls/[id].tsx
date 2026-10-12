@@ -1,11 +1,12 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 
 import { findWall } from '@/core/walls';
 import { Message } from '@/ui/components';
 import { WallView } from '@/ui/wall-view';
 
+/** /walls/<id>?route=<uuid> opens the wall with that route selected. */
 export default function WallScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, route } = useLocalSearchParams<{ id: string; route?: string }>();
   const wall = findWall(id);
 
   if (!wall) {
@@ -16,5 +17,11 @@ export default function WallScreen() {
       </>
     );
   }
-  return <WallView wall={wall} />;
+  return (
+    <WallView
+      wall={wall}
+      selected={route || null}
+      onSelect={(uuid) => router.setParams({ route: uuid ?? undefined })}
+    />
+  );
 }

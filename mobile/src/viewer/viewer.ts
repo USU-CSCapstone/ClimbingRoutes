@@ -30,6 +30,8 @@ const TAP_SLOP = 6;
 const TAP_MS = 600;
 /** How far from a line a tap can land and still pick the route, in CSS pixels. */
 const LINE_REACH = { touch: 24, other: 10 };
+/** How long the camera takes to fly to a route. */
+const FLIGHT_MS = 700;
 
 interface RouteState {
   route: ViewerRoute;
@@ -53,6 +55,12 @@ interface Home {
   distance: number;
 }
 
+/** A camera position as an orbit around a target. */
+interface Pose {
+  target: THREE.Vector3;
+  offset: THREE.Spherical;
+}
+
 /**
  * Builds a viewer inside `container`, which must have a size. The model loads
  * in the background; routes and settings given before it finishes are applied
@@ -68,6 +76,8 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
   const canvas = renderer.domElement;
   Object.assign(canvas.style, { display: 'block', touchAction: 'none' });
   const labelRenderer = new CSS2DRenderer();
+  // Labels on a wall are all about as far away, so stack them by highlight instead of distance.
+  labelRenderer.sortObjects = false;
   Object.assign(labelRenderer.domElement.style, {
     position: 'absolute',
     top: '0',
@@ -96,6 +106,9 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
   let highlighted: Uuid | null = null;
   let frontArc = options.frontArc ?? true;
   let overlays = { points: false, straight: false };
+  let flight: { from: Pose; to: Pose; start: number } | null = null;
+  /** A route to fly to once the model and its line have loaded. */
+  let focusWanted: Uuid | null = null;
   let disposed = false;
 
   function resize() {
@@ -235,6 +248,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
       state.labelGrade.style.color = state.color;
     });
     for (const state of routes.values()) redraw(state);
+    if (focusWanted) focus(focusWanted);
   }
 
   function addRoute(route: ViewerRoute): RouteState {
@@ -296,6 +310,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     state.label.visible = visible && points.length > 0;
     if (points.length) state.label.position.fromArray(points[0]);
     state.labelBox.style.opacity = String(opacity);
+    state.label.element.style.zIndex = isHighlighted ? '2' : '1';
   }
 
   function makeLine(points: THREE.Vector3[], color: string, width: number, opacity: number, dashed = false) {
@@ -331,9 +346,9 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
 
   // Camera
 
-  /** Frames the highlighted route, or the whole wall. */
-  function routeFrame(start: Home) {
-    const line = highlighted ? (routes.get(highlighted)?.line ?? []) : [];
+  /** Frames a route, by default the highlighted one, or with none the whole wall. */
+  function routeFrame(start: Home, uuid = highlighted) {
+    const line = uuid ? (routes.get(uuid)?.line ?? []) : [];
     if (line.length < 2) return { target: start.target, distance: start.distance };
     const box = new THREE.Box3().setFromPoints(line);
     const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, edge * 40);
@@ -343,6 +358,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
 
   function setView(azimuthDeg: number, elevationDeg: number) {
     if (!controls || !home) return;
+    flight = null;
     const frame = routeFrame(home);
     const offset = new THREE.Vector3().setFromSpherical(
       new THREE.Spherical(
@@ -354,6 +370,54 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     controls.target.copy(frame.target);
     camera.position.copy(frame.target).add(offset);
     controls.update();
+  }
+
+  /** Flies the camera to frame a route from straight in front, or with null the whole wall. */
+  function focus(uuid: Uuid | null) {
+    focusWanted = null;
+    if (!controls || !home || (uuid && (routes.get(uuid)?.line.length ?? 0) < 2)) {
+      focusWanted = uuid;
+      return;
+    }
+    const frame = routeFrame(home, uuid);
+    const to: Pose = { target: frame.target, offset: new THREE.Spherical(frame.distance, home.polar, home.azimuth) };
+    const from: Pose = {
+      target: controls.target.clone(),
+      offset: new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target)),
+    };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      place(to);
+      flight = null;
+    } else {
+      flight = { from, to, start: performance.now() };
+    }
+  }
+
+  function place({ target, offset }: Pose) {
+    controls?.target.copy(target);
+    camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(offset));
+  }
+
+  /** Moves the camera along an eased orbit from one pose to the next. */
+  function stepFlight(now: number) {
+    if (!flight) return;
+    const { from, to, start } = flight;
+    const t = Math.min(1, (now - start) / FLIGHT_MS);
+    const k = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+    const turn = Math.atan2(Math.sin(to.offset.theta - from.offset.theta), Math.cos(to.offset.theta - from.offset.theta));
+    place({
+      target: from.target.clone().lerp(to.target, k),
+      offset: new THREE.Spherical(
+        THREE.MathUtils.lerp(from.offset.radius, to.offset.radius, k),
+        THREE.MathUtils.lerp(from.offset.phi, to.offset.phi, k),
+        from.offset.theta + turn * k,
+      ),
+    });
+    if (t === 1) flight = null;
+  }
+
+  function cancelFlight() {
+    flight = null;
   }
 
   // Taps
@@ -409,6 +473,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
 
   function onPointerDown(e: PointerEvent) {
     pointers.add(e.pointerId);
+    flight = null;
     press =
       pointers.size === 1 && e.button === 0
         ? { id: e.pointerId, x: e.clientX, y: e.clientY, time: performance.now() }
@@ -425,10 +490,10 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
       return;
     }
     options.onSurfaceTap?.(pick(e.clientX, e.clientY));
-    if (options.onRouteTap) {
-      const uuid = routeAt(e.clientX, e.clientY, e.pointerType === 'touch' ? LINE_REACH.touch : LINE_REACH.other);
-      if (uuid) options.onRouteTap(uuid);
-    }
+    if (!options.onRouteTap && !options.onEmptyTap) return;
+    const uuid = routeAt(e.clientX, e.clientY, e.pointerType === 'touch' ? LINE_REACH.touch : LINE_REACH.other);
+    if (uuid) options.onRouteTap?.(uuid);
+    else options.onEmptyTap?.();
   }
 
   function onPointerCancel(e: PointerEvent) {
@@ -439,12 +504,14 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointercancel', onPointerCancel);
+  canvas.addEventListener('wheel', cancelFlight, { passive: true });
 
   // Render loop
 
   let frames = 0;
   let lastFps = performance.now();
   renderer.setAnimationLoop(() => {
+    stepFlight(performance.now());
     controls?.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
@@ -469,6 +536,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
       applyFrontArc();
     },
     setView,
+    focus,
     setOverlays(next) {
       overlays = { ...overlays, ...next };
       const state = highlighted ? routes.get(highlighted) : undefined;
@@ -486,6 +554,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerCancel);
+      canvas.removeEventListener('wheel', cancelFlight);
       controls?.dispose();
       for (const state of [...routes.values()]) removeRoute(state);
       disposeObject(scene);

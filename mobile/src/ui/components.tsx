@@ -1,9 +1,11 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link, router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Spacing, TapTarget } from '@/constants/theme';
-import type { Crumb, Discipline, Grade } from '@/core/types';
+import type { Crumb, Discipline, Grade, Uuid } from '@/core/types';
+import type { Wall } from '@/core/walls';
 import { useTheme } from '@/hooks/use-theme';
 import { useHrefs } from '@/ui/nav';
 import { AppText } from '@/ui/text';
@@ -113,6 +115,21 @@ export function Breadcrumb({ path }: { path: Crumb[] }) {
   );
 }
 
+/** Opens a wall's 3D model, with one of its routes selected if given. */
+export function WallLink({ wall, route, label }: { wall: Wall; route?: Uuid; label: string }) {
+  const theme = useTheme();
+  const href = (route ? `/walls/${wall.id}?route=${route}` : `/walls/${wall.id}`) as Href;
+  return (
+    <Pressable
+      role="link"
+      onPress={() => router.push(href)}
+      style={({ pressed }) => [styles.wallLink, { backgroundColor: theme.accent }, pressed && styles.pressed]}>
+      <Ionicons name="cube-outline" size={22} color={theme.accentText} />
+      <AppText style={[styles.wallLinkText, { color: theme.accentText }]}>{label}</AppText>
+    </Pressable>
+  );
+}
+
 export function Loading() {
   const theme = useTheme();
   return (
@@ -180,6 +197,16 @@ const styles = StyleSheet.create({
   crumbs: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   crumb: { flexDirection: 'row', alignItems: 'center' },
   crumbText: { fontWeight: '600' },
+  wallLink: {
+    minHeight: TapTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    borderRadius: 12,
+  },
+  wallLinkText: { fontWeight: '700' },
+  pressed: { opacity: 0.8 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, gap: Spacing.two },
   centerText: { textAlign: 'center' },
   section: { gap: Spacing.one },

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { type Href, router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,12 +11,13 @@ import {
   useWindowDimensions,
   View,
   type ViewStyle,
+  type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Spacing, TapTarget } from '@/constants/theme';
 import { DATA_URL } from '@/core/config';
-import type { Area } from '@/core/types';
+import type { Area, Uuid } from '@/core/types';
 import { type Wall, type WallRoute, wallRoutes } from '@/core/walls';
 import { useArea, useRoutesFile } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
@@ -35,8 +36,19 @@ const ON_DARK = Colors.dark;
 
 type ColoredRoute = WallRoute & { color: string };
 
-/** A wall's 3D model with its routes drawn on the rock, and the route list. */
-export function WallView({ wall }: { wall: Wall }) {
+/**
+ * A wall's 3D model with its routes drawn on the rock, and the route list.
+ * Selecting a route in either one highlights it in both.
+ */
+export function WallView({
+  wall,
+  selected,
+  onSelect,
+}: {
+  wall: Wall;
+  selected: Uuid | null;
+  onSelect: (uuid: Uuid | null) => void;
+}) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const wide = width >= WIDE;
@@ -64,6 +76,15 @@ export function WallView({ wall }: { wall: Wall }) {
         ? 'all drawn on the model'
         : `${drawn} drawn on the model`;
 
+  const selectedRoute = routes.find((r) => r.uuid === selected) ?? null;
+  const notice =
+    selectedRoute && !selectedRoute.line && saved.isSuccess ? `${selectedRoute.name} isn't drawn on the model yet` : null;
+
+  /** Tapping the selected route again clears the selection. */
+  function toggle(uuid: Uuid) {
+    onSelect(uuid === selectedRoute?.uuid ? null : uuid);
+  }
+
   return (
     <View style={[styles.page, wide && styles.pageWide, { backgroundColor: theme.background }]}>
       <Stack.Screen options={{ title: wall.name }} />
@@ -71,6 +92,10 @@ export function WallView({ wall }: { wall: Wall }) {
       <ModelPane
         wall={wall}
         lines={lines}
+        highlighted={selectedRoute?.line ? selectedRoute.uuid : null}
+        notice={notice}
+        onRouteTap={toggle}
+        onEmptyTap={() => onSelect(null)}
         onRetry={() => saved.refetch()}
         style={wide ? styles.modelWide : styles.modelNarrow}
       />
@@ -79,7 +104,15 @@ export function WallView({ wall }: { wall: Wall }) {
           wide ? styles.panelWide : styles.panelNarrow,
           { backgroundColor: theme.background, borderColor: theme.border },
         ]}>
-        <RouteList wall={wall} area={area} routes={routes} linesKnown={saved.isSuccess} linesNote={linesNote} />
+        <RouteList
+          wall={wall}
+          area={area}
+          routes={routes}
+          selected={selectedRoute?.uuid ?? null}
+          onPress={toggle}
+          linesKnown={saved.isSuccess}
+          linesNote={linesNote}
+        />
       </View>
     </View>
   );
@@ -88,11 +121,20 @@ export function WallView({ wall }: { wall: Wall }) {
 function ModelPane({
   wall,
   lines,
+  highlighted,
+  notice,
+  onRouteTap,
+  onEmptyTap,
   onRetry,
   style,
 }: {
   wall: Wall;
   lines: ViewerRoute[];
+  highlighted: Uuid | null;
+  /** A short message over the model, like why a selected route isn't shown. */
+  notice: string | null;
+  onRouteTap: (uuid: Uuid) => void;
+  onEmptyTap: () => void;
   onRetry: () => void;
   style: StyleProp<ViewStyle>;
 }) {
@@ -117,15 +159,25 @@ function ModelPane({
           key={attempt}
           model={`${DATA_URL}/models/${encodeURIComponent(wall.model)}`}
           routes={lines}
+          highlighted={highlighted}
           onProgress={(fraction) => setPercent(Math.floor(fraction * 100))}
           onLoad={setInfo}
           onError={setError}
+          onRouteTap={onRouteTap}
+          onEmptyTap={onEmptyTap}
           onFps={__DEV__ ? setFps : undefined}
           dom={{ style: styles.fill, scrollEnabled: false }}
         />
       </Suspense>
       {error ? <LoadError message={error} onRetry={retry} /> : info ? null : <LoadProgress percent={percent} />}
       {__DEV__ && info ? <DevStats info={info} fps={fps} /> : null}
+      {notice && info ? (
+        <View style={[styles.notice, styles.passThrough]}>
+          <AppText type="small" style={styles.noticeText}>
+            {notice}
+          </AppText>
+        </View>
+      ) : null}
       <BackButton wall={wall} />
     </View>
   );
@@ -212,25 +264,58 @@ function RouteList({
   wall,
   area,
   routes,
+  selected,
+  onPress,
   linesKnown,
   linesNote,
 }: {
   wall: Wall;
   area: ReturnType<typeof useArea>;
   routes: ColoredRoute[];
+  selected: Uuid | null;
+  onPress: (uuid: Uuid) => void;
   /** False until the route lines file has loaded, so "not drawn" isn't claimed early. */
   linesKnown: boolean;
   linesNote: string | null;
 }) {
   const insets = useSafeAreaInsets();
+  const list = useRef<FlatList<ColoredRoute>>(null);
+  const visible = useRef(new Set<string>());
+  const retries = useRef(0);
+  // FlatList throws if this handler ever changes, so keep the first one (state survives hot reloads).
+  const [onViewableItemsChanged] = useState(
+    () =>
+      ({ viewableItems }: { viewableItems: ViewToken<ColoredRoute>[] }) => {
+        visible.current = new Set(viewableItems.map((v) => v.key));
+      },
+  );
+  const index = routes.findIndex((r) => r.uuid === selected);
+
+  // A route picked on the model or opened from a link scrolls into view.
+  useEffect(() => {
+    if (index < 0 || !selected || visible.current.has(selected)) return;
+    retries.current = 0;
+    list.current?.scrollToIndex({ index, viewPosition: 0.5 });
+  }, [index, selected]);
+
   if (area.isPending) return <Loading />;
   if (area.error) return <Message title="Couldn't load the routes" detail={area.error.message} />;
   if (!area.data) return <Message title="Routes not found" detail="OpenBeta has no area for this wall." />;
 
   return (
     <FlatList
+      ref={list}
       data={routes}
       keyExtractor={(r) => r.uuid}
+      extraData={selected}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={VIEWABILITY}
+      onScrollToIndexFailed={({ index: failed }) => {
+        // Rows can't be scrolled to until they've been measured, so try again shortly.
+        if (retries.current >= 3) return;
+        retries.current += 1;
+        setTimeout(() => list.current?.scrollToIndex({ index: failed, viewPosition: 0.5 }), 250);
+      }}
       ListHeaderComponent={<ListHeader wall={wall} area={area.data} count={routes.length} linesNote={linesNote} />}
       ListEmptyComponent={<Message title="No routes yet" detail="OpenBeta lists no routes on this wall." />}
       ListFooterComponent={
@@ -238,11 +323,16 @@ function RouteList({
           Route data from OpenBeta (CC0)
         </AppText>
       }
-      renderItem={({ item }) => <RouteRow route={item} linesKnown={linesKnown} />}
+      renderItem={({ item }) => (
+        <RouteRow route={item} selected={item.uuid === selected} onPress={onPress} linesKnown={linesKnown} />
+      )}
       contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.four }}
     />
   );
 }
+
+/** A row counts as on screen once it's almost fully visible. */
+const VIEWABILITY = { itemVisiblePercentThreshold: 90 };
 
 function ListHeader({
   wall,
@@ -276,18 +366,35 @@ function ListHeader({
   );
 }
 
-function RouteRow({ route, linesKnown }: { route: ColoredRoute; linesKnown: boolean }) {
+function RouteRow({
+  route,
+  selected,
+  onPress,
+  linesKnown,
+}: {
+  route: ColoredRoute;
+  selected: boolean;
+  onPress: (uuid: Uuid) => void;
+  linesKnown: boolean;
+}) {
   const theme = useTheme();
   const drawn = route.line != null;
   const status = drawn ? 'Drawn on the model' : linesKnown ? 'Not drawn yet' : null;
   const details = [disciplineText(route.disciplines), status].filter(Boolean).join(' · ');
   return (
-    <View
-      accessible
+    <Pressable
+      role="button"
+      accessibilityState={{ selected }}
       accessibilityLabel={[`${route.number}. ${route.name}`, route.grade?.text ?? 'no grade', status?.toLowerCase()]
         .filter(Boolean)
         .join(', ')}
-      style={[styles.row, { borderBottomColor: theme.border }]}>
+      onPress={() => onPress(route.uuid)}
+      style={({ pressed }) => [
+        styles.row,
+        { borderBottomColor: theme.border },
+        (selected || pressed) && { backgroundColor: theme.backgroundElement },
+      ]}>
+      {selected ? <View style={[styles.selectedBar, { backgroundColor: drawn ? route.color : theme.text }]} /> : null}
       <View
         style={[
           styles.number,
@@ -308,7 +415,7 @@ function RouteRow({ route, linesKnown }: { route: ColoredRoute; linesKnown: bool
         </AppText>
       </View>
       <GradeBadge grade={route.grade} />
-    </View>
+    </Pressable>
   );
 }
 
@@ -402,6 +509,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   numberEmpty: { borderStyle: 'dashed' },
+  selectedBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+  notice: {
+    position: 'absolute',
+    bottom: Spacing.five,
+    alignSelf: 'center',
+    maxWidth: '90%',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  noticeText: { color: ON_DARK.text, textAlign: 'center' },
   numberText: { fontWeight: '800', fontVariant: ['tabular-nums'] },
   rowText: { flex: 1 },
   rowTitle: { fontWeight: '600' },
