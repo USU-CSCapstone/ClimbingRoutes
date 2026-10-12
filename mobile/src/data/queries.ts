@@ -1,6 +1,7 @@
 import { keepPreviousData, QueryClient, useQuery } from '@tanstack/react-query';
 
-import { fetchArea, fetchClimb } from '@/core/openbeta/api';
+import { MAP_AREA, WALLS_WITH_MODELS } from '@/core/config';
+import { fetchArea, fetchClimb, fetchWalls } from '@/core/openbeta/api';
 import { MIN_QUERY_LENGTH, search } from '@/core/search';
 import type { Uuid } from '@/core/types';
 
@@ -25,6 +26,15 @@ export function useClimb(uuid: Uuid) {
   return useQuery({
     queryKey: ['climb', uuid],
     queryFn: ({ signal }) => fetchClimb(uuid, signal),
+  });
+}
+
+/** Walls on the map, marking the ones with a 3D model. */
+export function useMapWalls() {
+  return useQuery({
+    queryKey: ['walls', MAP_AREA.path],
+    queryFn: ({ signal }) => fetchWalls(MAP_AREA.path, signal),
+    select: (walls) => walls.map((w) => ({ ...w, hasModel: WALLS_WITH_MODELS.includes(w.uuid) })),
   });
 }
 

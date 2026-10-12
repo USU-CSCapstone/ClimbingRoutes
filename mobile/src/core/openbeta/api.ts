@@ -10,6 +10,7 @@ import type {
   GradeSystem,
   LatLng,
   Uuid,
+  WallLocation,
 } from '../types';
 import { gql } from './graphql';
 
@@ -90,6 +91,32 @@ query Climb($uuid: ID) {
     metadata { leftRightIndex lat lng }
   }
 }`;
+
+const WALLS_QUERY = `
+query Walls($path: [String]!) {
+  areas(filter: { path_tokens: { tokens: $path, exactMatch: false }, leaf_status: { isLeaf: true } }) {
+    uuid area_name totalClimbs
+    metadata { lat lng }
+  }
+}`;
+
+interface ObWall {
+  uuid: string;
+  area_name: string;
+  totalClimbs: number | null;
+  metadata: { lat: number | null; lng: number | null } | null;
+}
+
+/** Every wall under the area at `path`, skipping walls with no coordinates. */
+export async function fetchWalls(path: string[], signal?: AbortSignal): Promise<WallLocation[]> {
+  const { areas } = await gql<{ areas: ObWall[] }>(WALLS_QUERY, { path }, signal);
+  const walls: WallLocation[] = [];
+  for (const a of areas) {
+    const location = toLatLng(a.metadata?.lat, a.metadata?.lng);
+    if (location) walls.push({ uuid: a.uuid, name: a.area_name, totalClimbs: a.totalClimbs ?? 0, location });
+  }
+  return walls.sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export async function fetchArea(uuid: Uuid, signal?: AbortSignal): Promise<Area | null> {
   const { area } = await gql<{ area: ObArea | null }>(AREA_QUERY, { uuid }, signal);

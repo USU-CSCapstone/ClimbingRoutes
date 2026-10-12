@@ -5,6 +5,7 @@ All route and area data comes from [OpenBeta](https://openbeta.io). The data is 
 ## How the app uses it
 
 - **Areas and routes:** the GraphQL API at `https://api.openbeta.io`, looked up by uuid
+- **Map:** every wall under Logan Canyon, found by its path names with the `areas` query. Walls with no coordinates are left off
 - **Search:** openbeta.io's own search server (Typesense), using the read-only key from their public website code. It isn't a documented API and the key could change. If it fails, the app falls back to GraphQL area search, which can't find routes
 - **Coverage:** browsing and search start at the USA
 - **Caching:** responses are cached in memory for a day. Nothing is stored on the device yet

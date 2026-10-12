@@ -51,6 +51,14 @@ export interface Area extends AreaSummary {
   climbs: ClimbSummary[];
 }
 
+/** A wall with coordinates, for the map. */
+export interface WallLocation {
+  uuid: Uuid;
+  name: string;
+  totalClimbs: number;
+  location: LatLng;
+}
+
 export interface ClimbSummary {
   uuid: Uuid;
   name: string;

@@ -24,7 +24,7 @@ npx expo lint
 
 ## Layout
 
-- `src/app/` screens and navigation (Expo Router). Explore and Search share the area and route pages through the `(explore,search)` group
+- `src/app/` screens and navigation (Expo Router). Explore, Map and Search share the area and route pages through the `(explore,map,search)` group
 - `src/core/` types, OpenBeta client, search, grades. No React imports, so Node scripts can reuse it (enforced by lint)
 - `src/data/` React Query hooks and caching
 - `src/ui/` shared components
@@ -32,6 +32,7 @@ npx expo lint
 ## Data
 
 - **Area and route pages:** OpenBeta GraphQL at `api.openbeta.io`, looked up by uuid
+- **Map:** every wall under Logan Canyon from one GraphQL `areas` query, drawn with MapLibre on OpenFreeMap tiles. The map is a DOM component (`src/ui/wall-map.tsx`), so it runs in a WebView on phones and works in Expo Go
 - **Search:** openbeta.io's Typesense server, using the read-only key from their public website code. It isn't a documented API and the key could change. If it fails, search falls back to GraphQL area search, which can't find routes
 - **Caching:** responses are cached in memory for a day. Nothing is stored on the device yet
 - **License:** OpenBeta data is CC0. The route page credits OpenBeta
