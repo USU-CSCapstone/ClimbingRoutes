@@ -2,6 +2,8 @@
 
 Prove that phone photos of a real Logan Canyon wall can become a 3D model that a phone can display, and that a route line drawn on that model reads correctly from multiple angles.
 
+**Status:** finished. Results are at the end, and the day-by-day log is in [POC-work.md](POC-work.md). The project has since moved on to the app, with 3D walls as phase 2 in [requirements.md](requirements.md).
+
 ## Purpose
 
 The POC exists to answer four questions before the team commits to the platform or the wall height target.
@@ -87,3 +89,21 @@ Legibility is scored by a climber who knows the wall, per route, on three points
 3. The viewer page with one labeled route, demonstrated on a phone
 4. A results file with the filled metrics table, screenshots, and the exit decision
 5. The OpenBeta query and its returned JSON for the wall
+
+## Results
+
+| Metric | Target | Result |
+|---|---|---|
+| Processing time | Recorded | About 4 minutes for 16 photos on the team PC |
+| Compressed GLB size | 50 MB or less | 11.8 MB (300k triangles, 8K texture as JPEG) |
+| Phone frame rate | 30 fps or more | 60 fps on an iPhone, at 2K and 8K textures |
+| Route line stays on the rock | No floating or sinking | Lines are draped onto the surface; the five-angle check wasn't recorded |
+| Legibility, overall and top third | 80% or more | Not recorded |
+
+What we learned beyond the targets:
+
+- 16 overlapping photos were enough for a usable model
+- Normal-quality reconstruction is the minimum; preview quality is too rough to judge
+- Texturing the full-detail mesh before simplifying keeps the texture sharp
+- An 8K texture is visibly sharper than 2K on a phone. Stored as JPEG instead of PNG, it costs a third of the file size with no visible loss
+- Each reconstruction has its own coordinate system, so route lines only fit the model they were drawn on

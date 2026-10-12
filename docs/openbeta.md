@@ -1,8 +1,28 @@
 # OpenBeta Data
 
-Route names and grades for the test wall come from the [OpenBeta](https://openbeta.io) GraphQL API. The data is CC0 and needs no API key.
+All route and area data comes from [OpenBeta](https://openbeta.io). The data is CC0 and the API needs no key. Mountain Project's API is closed to new developers, so OpenBeta is the only open option.
 
-## Date Wall
+## How the app uses it
+
+- **Areas and routes:** the GraphQL API at `https://api.openbeta.io`, looked up by uuid
+- **Search:** openbeta.io's own search server (Typesense), using the read-only key from their public website code. It isn't a documented API and the key could change. If it fails, the app falls back to GraphQL area search, which can't find routes
+- **Coverage:** browsing and search start at the USA
+- **Caching:** responses are cached in memory for a day. Nothing is stored on the device yet
+- **Credit:** the route page credits OpenBeta
+
+The endpoints and key are in `mobile/src/core/config.ts`.
+
+## Gaps
+
+Coverage is uneven. Common gaps:
+
+- Length and bolt count missing (returned as `-1`)
+- No description, location or protection text
+- Safety rating left as `UNSPECIFIED`
+- No per-route coordinates
+- No left-to-right order (`leftRightIndex`) for some walls, so their routes can't be numbered like a topo
+
+## POC test wall: Date Wall
 
 - **Area:** USA › Utah › Wasatch Range › Northern Wasatch › Cache Valley › Logan Canyon › Date Wall
 - **uuid:** `8c45d40d-363d-5a9b-9659-3df50c5d3916`
@@ -18,27 +38,10 @@ Route names and grades for the test wall come from the [OpenBeta](https://openbe
 | 4 | Hooked | 5.10a | 6a | Lance Dickey |
 | 5 | NCMO | 5.6 | 4c | Eric Ripplinger |
 
-All six are sport routes. `leftRightIndex` gives their order on the wall, which should help match each route to the model.
+All six are sport routes with name and grade only. Length, bolts and descriptions are missing.
 
-## Files
+Files:
 
-- `scripts/openbeta/date-wall.graphql` is the query
-- `scripts/openbeta/fetch-date-wall.mjs` sends it and writes the response
-- `data/openbeta/date-wall.json` is the raw response, unmodified
-
-To refresh the data, run the script with Node 18 or newer:
-
-```
-node scripts/openbeta/fetch-date-wall.mjs
-```
-
-## Gaps
-
-Coverage for Date Wall is thin. These fields exist in OpenBeta but come back empty, so the query leaves them out:
-
-- Length and bolt count (returned as `-1`)
-- Description, location, and protection text
-- Safety rating (`UNSPECIFIED`)
-- Per-route coordinates
-
-Name and grade are all the POC needs for the route label. Anything beyond that will have to be recorded by the team.
+- `scripts/openbeta/date-wall.graphql`: the query
+- `scripts/openbeta/fetch-date-wall.mjs`: sends it and writes the response. Run with Node 18 or newer: `node scripts/openbeta/fetch-date-wall.mjs`
+- `data/openbeta/date-wall.json`: the raw response
