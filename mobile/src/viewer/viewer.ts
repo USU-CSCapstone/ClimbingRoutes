@@ -32,6 +32,9 @@ const TAP_MS = 600;
 const LINE_REACH = { touch: 24, other: 10 };
 /** How long the camera takes to fly to a route. */
 const FLIGHT_MS = 700;
+/** How far a label sits above its route's first point, in CSS pixels. */
+const LABEL_LIFT = 20;
+const LABEL_GAP = 3;
 
 interface RouteState {
   route: ViewerRoute;
@@ -45,6 +48,10 @@ interface RouteState {
   labelBox: HTMLDivElement;
   labelName: HTMLSpanElement;
   labelGrade: HTMLSpanElement;
+  /** Measured once the label is on screen; cleared when its text changes. */
+  labelSize: { width: number; height: number } | null;
+  /** How far the label was moved down to clear the labels around it. */
+  labelShift: number;
 }
 
 /** Where the camera starts, straight in front of the wall. */
@@ -242,8 +249,12 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
         state.line = draped?.line ?? [];
         state.stats = draped?.stats ?? null;
       }
-      state.labelName.textContent = route.name;
-      state.labelGrade.textContent = route.grade?.text ?? '?';
+      const grade = route.grade?.text ?? '?';
+      if (state.labelName.textContent !== route.name || state.labelGrade.textContent !== grade) {
+        state.labelName.textContent = route.name;
+        state.labelGrade.textContent = grade;
+        state.labelSize = null;
+      }
       state.labelBox.style.borderLeftColor = state.color;
       state.labelGrade.style.color = state.color;
     });
@@ -273,6 +284,8 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
       labelBox,
       labelName,
       labelGrade,
+      labelSize: null,
+      labelShift: 0,
     };
     routes.set(route.uuid, state);
     return state;
@@ -506,6 +519,52 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
   canvas.addEventListener('pointercancel', onPointerCancel);
   canvas.addEventListener('wheel', cancelFlight, { passive: true });
 
+  // Labels
+
+  /**
+   * Routes that start close together would stack their labels on top of each
+   * other. The highlighted label keeps its place, then the rest go left to
+   * right, each moved down just far enough to clear the ones already placed.
+   */
+  function declutterLabels() {
+    const placed: { left: number; right: number; top: number; bottom: number }[] = [];
+    const v = new THREE.Vector3();
+    const order = [...routes.values()].sort(
+      (a, b) => Number(b.route.uuid === highlighted) - Number(a.route.uuid === highlighted),
+    );
+    for (const state of order) {
+      if (!state.label.visible) continue;
+      v.copy(state.label.position).project(camera);
+      if (v.z > 1) continue;
+      if (!state.labelSize) {
+        const { offsetWidth: width, offsetHeight: height } = state.labelBox;
+        if (!width) continue;
+        state.labelSize = { width, height };
+      }
+      const { width, height } = state.labelSize;
+      const x = ((v.x + 1) / 2) * size.x;
+      const y = ((1 - v.y) / 2) * size.y - LABEL_LIFT;
+      const box = { left: x - width / 2, right: x + width / 2, top: y - height / 2, bottom: y + height / 2 };
+      let shift = 0;
+      for (let moved = true; moved; ) {
+        moved = false;
+        for (const p of placed) {
+          const overlaps =
+            box.left < p.right && box.right > p.left && box.top + shift < p.bottom && box.bottom + shift > p.top;
+          if (overlaps) {
+            shift = p.bottom + LABEL_GAP - box.top;
+            moved = true;
+          }
+        }
+      }
+      placed.push({ ...box, top: box.top + shift, bottom: box.bottom + shift });
+      if (shift !== state.labelShift) {
+        state.labelShift = shift;
+        state.labelBox.style.transform = `translateY(${shift - LABEL_LIFT}px)`;
+      }
+    }
+  }
+
   // Render loop
 
   let frames = 0;
@@ -515,6 +574,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     controls?.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
+    declutterLabels();
     if (!options.onFps) return;
     frames++;
     const now = performance.now();
@@ -583,7 +643,7 @@ function segmentDistance(x: number, y: number, a: THREE.Vector2, b: THREE.Vector
 function makeLabel() {
   const box = document.createElement('div');
   Object.assign(box.style, {
-    transform: 'translateY(-20px)',
+    transform: `translateY(${-LABEL_LIFT}px)`,
     background: 'rgba(15, 16, 19, 0.9)',
     color: '#fff',
     borderLeft: '3px solid',

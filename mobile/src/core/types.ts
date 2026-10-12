@@ -70,6 +70,8 @@ export interface Climb extends ClimbSummary {
   locationText: string | null;
   protection: string | null;
   location: LatLng | null;
+  /** The route's id on Mountain Project, when OpenBeta has one. */
+  mpId: string | null;
 }
 
 export type SearchResult =

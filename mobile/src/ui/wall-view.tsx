@@ -22,6 +22,7 @@ import { type Wall, type WallRoute, wallRoutes } from '@/core/walls';
 import { useArea, useRoutesFile } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { climbCount, disciplineText, GradeBadge, Loading, Message } from '@/ui/components';
+import { RouteDetails } from '@/ui/route-details';
 import { AppText } from '@/ui/text';
 import { ROUTE_COLORS } from '@/viewer/colors';
 import type { ModelInfo, ViewerRoute } from '@/viewer/types';
@@ -76,7 +77,8 @@ export function WallView({
         ? 'all drawn on the model'
         : `${drawn} drawn on the model`;
 
-  const selectedRoute = routes.find((r) => r.uuid === selected) ?? null;
+  const index = routes.findIndex((r) => r.uuid === selected);
+  const selectedRoute = routes[index] ?? null;
   const notice =
     selectedRoute && !selectedRoute.line && saved.isSuccess ? `${selectedRoute.name} isn't drawn on the model yet` : null;
 
@@ -104,6 +106,16 @@ export function WallView({
           wide ? styles.panelWide : styles.panelNarrow,
           { backgroundColor: theme.background, borderColor: theme.border },
         ]}>
+        {selectedRoute ? (
+          <RouteDetails
+            route={selectedRoute}
+            previous={routes[index - 1] ?? null}
+            next={routes[index + 1] ?? null}
+            linesKnown={saved.isSuccess}
+            onSelect={onSelect}
+            onClose={() => onSelect(null)}
+          />
+        ) : null}
         <RouteList
           wall={wall}
           area={area}
@@ -316,7 +328,15 @@ function RouteList({
         retries.current += 1;
         setTimeout(() => list.current?.scrollToIndex({ index: failed, viewPosition: 0.5 }), 250);
       }}
-      ListHeaderComponent={<ListHeader wall={wall} area={area.data} count={routes.length} linesNote={linesNote} />}
+      ListHeaderComponent={
+        <ListHeader
+          wall={wall}
+          area={area.data}
+          count={routes.length}
+          linesNote={linesNote}
+          compact={selected != null}
+        />
+      }
       ListEmptyComponent={<Message title="No routes yet" detail="OpenBeta lists no routes on this wall." />}
       ListFooterComponent={
         <AppText type="small" color="textSecondary" style={styles.credit}>
@@ -339,17 +359,28 @@ function ListHeader({
   area,
   count,
   linesNote,
+  compact,
 }: {
   wall: Wall;
   area: Area;
   count: number;
   linesNote: string | null;
+  /** Just the list label, leaving room for the route details above. */
+  compact: boolean;
 }) {
   const place = area.path
     .slice(-2)
     .map((c) => c.name)
     .join(' › ');
   const hasOrder = area.climbs.some((c) => c.leftRightIndex != null);
+  const label = hasOrder ? 'Routes, left to right' : 'Routes';
+  if (compact) {
+    return (
+      <AppText type="label" color="textSecondary" style={styles.compactHeader}>
+        {wall.name} · {label}
+      </AppText>
+    );
+  }
   return (
     <View style={styles.header}>
       {place ? (
@@ -360,7 +391,7 @@ function ListHeader({
       <AppText type="title">{wall.name}</AppText>
       <AppText color="textSecondary">{[climbCount(count), linesNote].filter(Boolean).join(' · ')}</AppText>
       <AppText type="label" color="textSecondary" style={styles.listLabel}>
-        {hasOrder ? 'Routes, left to right' : 'Routes'}
+        {label}
       </AppText>
     </View>
   );
@@ -491,6 +522,7 @@ const styles = StyleSheet.create({
   devText: { color: ON_DARK.text, fontVariant: ['tabular-nums'] },
   header: { padding: Spacing.three, paddingTop: Spacing.four, gap: Spacing.one },
   listLabel: { marginTop: Spacing.three },
+  compactHeader: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, paddingBottom: Spacing.one },
   row: {
     minHeight: TapTarget,
     flexDirection: 'row',

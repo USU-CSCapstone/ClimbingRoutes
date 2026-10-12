@@ -43,7 +43,12 @@ interface ObClimb extends ObClimbSummary {
   ancestors: string[];
   pathTokens: string[];
   content: { description: string | null; location: string | null; protection: string | null } | null;
-  metadata: { leftRightIndex: number | null; lat: number | null; lng: number | null } | null;
+  metadata: {
+    leftRightIndex: number | null;
+    lat: number | null;
+    lng: number | null;
+    mp_id: string | null;
+  } | null;
 }
 
 interface ObAreaSummary {
@@ -87,7 +92,7 @@ query Climb($uuid: ID) {
     uuid name fa length boltsCount ancestors pathTokens
     ${GRADES} ${TYPE}
     content { description location protection }
-    metadata { leftRightIndex lat lng }
+    metadata { leftRightIndex lat lng mp_id }
   }
 }`;
 
@@ -123,6 +128,7 @@ export async function fetchClimb(uuid: Uuid, signal?: AbortSignal): Promise<Clim
     locationText: text(climb.content?.location),
     protection: text(climb.content?.protection),
     location: toLatLng(climb.metadata?.lat, climb.metadata?.lng),
+    mpId: text(climb.metadata?.mp_id),
   };
 }
 
