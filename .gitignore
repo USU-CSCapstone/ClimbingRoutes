@@ -1,0 +1,38 @@
+# Finished models (data/models/*.glb) and saved routes (data/routes/*.json) ARE tracked.
+
+# Raw photo captures: too large for git; keep photo sets outside the repo
+*.heic
+*.HEIC
+rsmeta.db
+
+# RealityScan projects and intermediate exports (only the finished GLB belongs in data/models/)
+*.rsproj
+*.rsInfo
+*.imagelist
+*_raw.glb
+*_u[0-9]*_v[0-9]*_*.png
+*_u[0-9]*_v[0-9]*_*.jpg
+
+# Half-written files (scripts/viewer/serve.mjs writes <file>.tmp, then renames it)
+*.tmp
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Secrets
+.env
+.env.*
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+*.blend1
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code per-person settings
+.claude/settings.local.json

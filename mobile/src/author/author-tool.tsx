@@ -4,14 +4,14 @@ import type { DOMProps } from 'expo/dom';
 import { type CSSProperties, useEffect, useEffectEvent, useRef, useState } from 'react';
 
 import { STYLES } from '@/author/styles';
+import { DATA_URL } from '@/core/config';
 import { gradeFromText, pickGrade } from '@/core/grades';
 import type { RoutesFile } from '@/core/routes-file';
 import type { Grade, GradeSystem, Uuid } from '@/core/types';
+import { ROUTE_COLORS } from '@/viewer/colors';
 import type { DrapeStats, ModelInfo, SurfaceHit, Vec3, Viewer, ViewerRoute } from '@/viewer/types';
-import { createViewer, ROUTE_COLORS } from '@/viewer/viewer';
+import { createViewer } from '@/viewer/viewer';
 
-/** scripts/viewer/serve.mjs, which serves data/ and writes the saves. */
-const DATA_URL = 'http://localhost:8765/data';
 const OPENBETA_FILE = `${DATA_URL}/openbeta/date-wall.json`;
 const NOT_RUNNING = 'Is scripts/viewer/serve.mjs running?';
 /** Camera angles from straight in front of the wall: [label, azimuth, elevation]. */

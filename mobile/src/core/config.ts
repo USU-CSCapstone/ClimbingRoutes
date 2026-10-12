@@ -8,3 +8,6 @@ export const TYPESENSE_KEY = 'bCGIB4sHsJRy06NFjZLtxKIMgr4aO0tX';
 
 /** v1 covers the USA. Explore starts here and search is limited to it. */
 export const ROOT_AREA = { uuid: '1db1e8ba-a40e-587c-88a4-64f5ea814b8e', name: 'USA' };
+
+/** The repo's data/ folder (wall models and route lines), served by scripts/viewer/serve.mjs. */
+export const DATA_URL = 'http://localhost:8765/data';

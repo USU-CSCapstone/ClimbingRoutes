@@ -1,6 +1,7 @@
 import { keepPreviousData, QueryClient, useQuery } from '@tanstack/react-query';
 
 import { fetchArea, fetchClimb } from '@/core/openbeta/api';
+import { fetchRoutesFile } from '@/core/routes-file';
 import { MIN_QUERY_LENGTH, search } from '@/core/search';
 import type { Uuid } from '@/core/types';
 
@@ -25,6 +26,15 @@ export function useClimb(uuid: Uuid) {
   return useQuery({
     queryKey: ['climb', uuid],
     queryFn: ({ signal }) => fetchClimb(uuid, signal),
+  });
+}
+
+export function useRoutesFile(file: string) {
+  return useQuery({
+    queryKey: ['routes-file', file],
+    queryFn: ({ signal }) => fetchRoutesFile(file, signal),
+    // Lines change whenever someone saves in the author tool.
+    staleTime: 0,
   });
 }
 

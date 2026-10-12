@@ -13,10 +13,10 @@ import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer
 import { acceleratedRaycast, MeshBVH } from 'three-mesh-bvh';
 
 import type { Uuid } from '@/core/types';
+import { ROUTE_COLORS } from '@/viewer/colors';
 import { drape, findCapturedFace, typicalEdge } from '@/viewer/geometry';
 import type { DrapeStats, ModelInfo, SurfaceHit, Viewer, ViewerOptions, ViewerRoute } from '@/viewer/types';
 
-export const ROUTE_COLORS = ['#ffd23f', '#3fd0ff', '#ff5ad1', '#ff8a3d', '#7dff5a', '#b58cff', '#ffffff', '#ff5a5a'];
 const STRAIGHT_COLOR = '#ff5a5a';
 const BACKGROUND = '#1b1d21';
 /** Opacity of the other routes while one is highlighted. */

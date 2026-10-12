@@ -1,9 +1,12 @@
-import { Stack } from 'expo-router';
-import { FlatList, StyleSheet, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { type Href, router, Stack } from 'expo-router';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing, TapTarget } from '@/constants/theme';
 import type { Area, AreaSummary, ClimbSummary, Uuid } from '@/core/types';
+import { type Wall, wallForArea } from '@/core/walls';
 import { useArea } from '@/data/queries';
+import { useTheme } from '@/hooks/use-theme';
 import {
   Breadcrumb,
   climbCount,
@@ -73,12 +76,14 @@ export function AreaView({ uuid }: { uuid: Uuid }) {
 
 function AreaHeader({ area }: { area: Area }) {
   const hasOrder = area.climbs.some((c) => c.leftRightIndex != null);
+  const wall = wallForArea(area.uuid);
   return (
     <View style={styles.header}>
       {area.path.length > 0 ? <Breadcrumb path={area.path} /> : null}
       <AppText type="title">{area.name}</AppText>
       <AppText color="textSecondary">{climbCount(area.totalClimbs)}</AppText>
       {area.description ? <AppText numberOfLines={6}>{area.description}</AppText> : null}
+      {wall ? <WallButton wall={wall} /> : null}
       {area.climbs.length > 0 ? (
         <AppText type="label" color="textSecondary" style={styles.listLabel}>
           {hasOrder ? 'Routes, left to right' : 'Routes'}
@@ -88,8 +93,32 @@ function AreaHeader({ area }: { area: Area }) {
   );
 }
 
+function WallButton({ wall }: { wall: Wall }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      role="link"
+      onPress={() => router.push(`/walls/${wall.id}` as Href)}
+      style={({ pressed }) => [styles.wallButton, { backgroundColor: theme.accent }, pressed && styles.pressed]}>
+      <Ionicons name="cube-outline" size={22} color={theme.accentText} />
+      <AppText style={[styles.wallButtonText, { color: theme.accentText }]}>View the wall in 3D</AppText>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   list: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', paddingBottom: Spacing.five },
   header: { padding: Spacing.three, gap: Spacing.two },
   listLabel: { marginTop: Spacing.two },
+  wallButton: {
+    minHeight: TapTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+    borderRadius: 12,
+  },
+  wallButtonText: { fontWeight: '700' },
+  pressed: { opacity: 0.8 },
 });

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "data",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/viewer/serve.mjs", "8765"],
+      "port": 8765
+    },
+    {
+      "name": "app",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["mobile/node_modules/expo/bin/cli", "start", "mobile", "--port", "8082"],
+      "port": 8082
+    }
+  ]
+}
