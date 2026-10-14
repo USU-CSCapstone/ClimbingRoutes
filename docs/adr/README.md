@@ -7,3 +7,7 @@ To add one, copy `template.md` to `NNNN-short-title.md` using the next number, f
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-photogrammetry.md) | RealityScan for 3D models | Accepted |
+| [0002](0002-expo-app.md) | Expo for iOS, Android and web | Accepted |
+| [0003](0003-openbeta-data.md) | OpenBeta for route data | Accepted |
+| [0004](0004-wall-viewer.md) | Wall viewer as plain three.js in an Expo DOM component | Accepted |
+| [0005](0005-wall-model-format.md) | One GLB per wall | Accepted |
