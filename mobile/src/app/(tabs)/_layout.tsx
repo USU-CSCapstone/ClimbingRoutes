@@ -17,6 +17,13 @@ export default function TabLayout() {
         name="(explore)"
         options={{
           title: 'Explore',
+          tabBarIcon: ({ color, size }) => <Ionicons name="compass" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="(map)"
+        options={{
+          title: 'Map',
           tabBarIcon: ({ color, size }) => <Ionicons name="map" color={color} size={size} />,
         }}
       />
