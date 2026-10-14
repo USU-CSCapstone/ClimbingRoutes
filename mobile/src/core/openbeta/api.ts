@@ -31,13 +31,13 @@ interface ObType {
 interface ObClimbSummary {
   uuid: string;
   name: string;
+  fa: string | null;
   grades: ObGrades;
   type: ObType | null;
   metadata: { leftRightIndex: number | null } | null;
 }
 
 interface ObClimb extends ObClimbSummary {
-  fa: string | null;
   length: number | null;
   boltsCount: number | null;
   ancestors: string[];
@@ -82,7 +82,7 @@ query Area($uuid: ID) {
     content { description }
     metadata { leaf isBoulder lat lng }
     children { uuid area_name totalClimbs metadata { leaf isBoulder } }
-    climbs { uuid name ${GRADES} ${TYPE} metadata { leftRightIndex } }
+    climbs { uuid name fa ${GRADES} ${TYPE} metadata { leftRightIndex } }
   }
 }`;
 
@@ -113,17 +113,11 @@ export async function fetchArea(uuid: Uuid, signal?: AbortSignal): Promise<Area 
 export async function fetchClimb(uuid: Uuid, signal?: AbortSignal): Promise<Climb | null> {
   const { climb } = await gql<{ climb: ObClimb | null }>(CLIMB_QUERY, { uuid }, signal);
   if (!climb) return null;
-  const allGrades: Climb['allGrades'] = {};
-  for (const [system, value] of Object.entries(climb.grades ?? {})) {
-    if (value) allGrades[system as GradeSystem] = value;
-  }
   return {
     ...toClimbSummary(climb),
     path: toCrumbs(climb.ancestors, climb.pathTokens),
-    allGrades,
     lengthMeters: positive(climb.length),
     bolts: positive(climb.boltsCount),
-    fa: text(climb.fa),
     description: text(climb.content?.description),
     locationText: text(climb.content?.location),
     protection: text(climb.content?.protection),
@@ -145,11 +139,17 @@ function toAreaSummary(a: ObAreaSummary): AreaSummary {
 function toClimbSummary(c: ObClimbSummary): ClimbSummary {
   const disciplines = toDisciplines(c.type);
   const lr = c.metadata?.leftRightIndex;
+  const allGrades: ClimbSummary['allGrades'] = {};
+  for (const [system, value] of Object.entries(c.grades ?? {})) {
+    if (value) allGrades[system as GradeSystem] = value;
+  }
   return {
     uuid: c.uuid,
     name: c.name,
     grade: pickGrade(c.grades, disciplines),
+    allGrades,
     disciplines,
+    fa: text(c.fa),
     leftRightIndex: lr != null && lr >= 0 ? lr : null,
   };
 }

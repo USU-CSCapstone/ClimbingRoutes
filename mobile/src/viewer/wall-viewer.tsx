@@ -4,7 +4,7 @@ import type { DOMProps } from 'expo/dom';
 import { useEffect, useEffectEvent, useRef } from 'react';
 
 import type { Uuid } from '@/core/types';
-import type { ModelInfo, Viewer, ViewerRoute } from '@/viewer/types';
+import type { Insets, ModelInfo, Viewer, ViewerRoute } from '@/viewer/types';
 import { createViewer } from '@/viewer/viewer';
 
 export interface WallViewerProps {
@@ -15,6 +15,10 @@ export interface WallViewerProps {
   highlighted?: Uuid | null;
   /** Keep the camera in front of the wall. Defaults to true. */
   frontArc?: boolean;
+  /** Space the screen's own controls cover, so routes are framed in what's left. */
+  insets?: Insets;
+  /** Change this number to fly the camera back to the whole wall. */
+  showWholeWall?: number;
   onProgress?: (fraction: number) => void;
   onLoad?: (info: ModelInfo) => void;
   onError?: (message: string) => void;
@@ -34,6 +38,8 @@ export default function WallViewer({
   routes,
   highlighted = null,
   frontArc = true,
+  insets,
+  showWholeWall = 0,
   onProgress,
   onLoad,
   onError,
@@ -43,6 +49,7 @@ export default function WallViewer({
 }: WallViewerProps) {
   const container = useRef<HTMLDivElement>(null);
   const viewer = useRef<Viewer | null>(null);
+  const { top = 0, right = 0, bottom = 0, left = 0 } = insets ?? {};
 
   // Effect events so new callback props don't rebuild the viewer and reload the model.
   const progressed = useEffectEvent((fraction: number) => onProgress?.(fraction));
@@ -71,11 +78,16 @@ export default function WallViewer({
   }, [model]);
 
   useEffect(() => viewer.current?.setRoutes(routes), [model, routes]);
+  // Before the highlight, so a flight that starts with it is framed for the new layout.
+  useEffect(() => viewer.current?.setInsets({ top, right, bottom, left }), [model, top, right, bottom, left]);
   useEffect(() => {
     viewer.current?.highlight(highlighted);
     if (highlighted) viewer.current?.focus(highlighted);
   }, [model, highlighted]);
   useEffect(() => viewer.current?.setFrontArc(frontArc), [model, frontArc]);
+  useEffect(() => {
+    if (showWholeWall) viewer.current?.focus(null);
+  }, [model, showWholeWall]);
 
   return <div ref={container} style={{ position: 'absolute', inset: 0 }} />;
 }

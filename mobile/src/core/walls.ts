@@ -2,7 +2,7 @@
 // A stand-in until the crag index lists walls.
 import { gradeFromText } from './grades';
 import type { SavedRoute } from './routes-file';
-import type { ClimbSummary, Discipline, Grade, Uuid } from './types';
+import type { ClimbSummary, Discipline, Grade, GradeSystem, Uuid } from './types';
 
 export interface Wall {
   /** Used in the page URL, /walls/<id>. */
@@ -38,7 +38,9 @@ export interface WallRoute {
   uuid: Uuid;
   name: string;
   grade: Grade | null;
+  allGrades: Partial<Record<GradeSystem, string>>;
   disciplines: Discipline[];
+  fa: string | null;
   /** Place on the wall from the left, starting at 1. */
   number: number;
   /** The line drawn on the model, or null if the route hasn't been drawn. */
@@ -56,13 +58,26 @@ export function wallRoutes(climbs: ClimbSummary[], saved: SavedRoute[]): WallRou
     ...climbs.map((c) => ({ ...c, line: lines.get(c.uuid) ?? null })),
     ...saved
       .filter((s) => !listed.has(s.openbeta_uuid))
-      .map((s) => ({ uuid: s.openbeta_uuid, name: s.name, grade: gradeFromText(s.grade), disciplines: [], line: s })),
+      .map((s) => {
+        const grade = gradeFromText(s.grade);
+        return {
+          uuid: s.openbeta_uuid,
+          name: s.name,
+          grade,
+          allGrades: grade ? { [grade.system]: grade.text } : {},
+          disciplines: [],
+          fa: null,
+          line: s,
+        };
+      }),
   ];
   return routes.map((r, i) => ({
     uuid: r.uuid,
     name: r.name,
     grade: r.grade,
+    allGrades: r.allGrades,
     disciplines: r.disciplines,
+    fa: r.fa,
     number: i + 1,
     line: r.line && { points: r.line.points, normals: r.line.normals },
   }));

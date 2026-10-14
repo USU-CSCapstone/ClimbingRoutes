@@ -62,9 +62,19 @@ export interface DrapeStats {
   deviations: number[];
 }
 
+/** Space the page's own controls cover at each edge, in CSS pixels. */
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface ViewerOptions {
   /** URL of the wall's GLB. */
   model: string;
+  /** Routes and the whole wall are framed in the area these leave uncovered. */
+  insets?: Insets;
   routes?: ViewerRoute[];
   /** Keep the camera in front of the wall. Defaults to true. */
   frontArc?: boolean;
@@ -91,6 +101,8 @@ export interface Viewer {
   /** Thickens one route's line and, unless dimOthers is off, dims the rest. Null shows them all evenly. */
   highlight(uuid: Uuid | null): void;
   setFrontArc(on: boolean): void;
+  /** Frames later camera moves around the page's controls. Doesn't move the camera itself. */
+  setInsets(insets: Insets): void;
   /**
    * Moves the camera to an angle from straight in front of the wall, framing
    * the highlighted route or, with none, the whole wall.

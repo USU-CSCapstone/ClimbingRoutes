@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 
 import { findWall } from '@/core/walls';
 import { Message } from '@/ui/components';
-import { WallView } from '@/ui/wall-view';
+import { WallView } from '@/ui/wall/wall-view';
 
 /** /walls/<id>?route=<uuid> opens the wall with that route selected. */
 export default function WallScreen() {

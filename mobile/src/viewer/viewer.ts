@@ -15,7 +15,15 @@ import { acceleratedRaycast, MeshBVH } from 'three-mesh-bvh';
 import type { Uuid } from '@/core/types';
 import { ROUTE_COLORS } from '@/viewer/colors';
 import { drape, findCapturedFace, typicalEdge } from '@/viewer/geometry';
-import type { DrapeStats, ModelInfo, SurfaceHit, Viewer, ViewerOptions, ViewerRoute } from '@/viewer/types';
+import type {
+  DrapeStats,
+  Insets,
+  ModelInfo,
+  SurfaceHit,
+  Viewer,
+  ViewerOptions,
+  ViewerRoute,
+} from '@/viewer/types';
 
 const STRAIGHT_COLOR = '#ff5a5a';
 const BACKGROUND = '#1b1d21';
@@ -32,6 +40,9 @@ const TAP_MS = 600;
 const LINE_REACH = { touch: 24, other: 10 };
 /** How long the camera takes to fly to a route. */
 const FLIGHT_MS = 700;
+/** Room left around the whole wall and around a framed route. */
+const WALL_MARGIN = 1.05;
+const ROUTE_MARGIN = 1.2;
 /** How far a label sits above its route's first point, in CSS pixels. */
 const LABEL_LIFT = 20;
 const LABEL_GAP = 3;
@@ -59,8 +70,13 @@ interface Home {
   azimuth: number;
   polar: number;
   target: THREE.Vector3;
-  distance: number;
+  /** Bounds of the captured face, which set how far back the whole wall needs. */
+  box: THREE.Box3;
+  /** Level direction from the wall toward the camera. */
+  facing: THREE.Vector3;
 }
+
+const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
 
 /** A camera position as an orbit around a target. */
 interface Pose {
@@ -116,6 +132,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
   let flight: { from: Pose; to: Pose; start: number } | null = null;
   /** A route to fly to once the model and its line have loaded. */
   let focusWanted: Uuid | null = null;
+  let insets = options.insets ?? NO_INSETS;
   let disposed = false;
 
   function resize() {
@@ -127,7 +144,32 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     labelRenderer.setSize(width, height);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    applyInsets();
     for (const m of lineMaterials) m.resolution.copy(size);
+  }
+
+  /** Shifts the picture so its middle is the middle of the area the page's controls leave uncovered. */
+  function applyInsets() {
+    const dx = (insets.left - insets.right) / 2;
+    const dy = (insets.top - insets.bottom) / 2;
+    if (!dx && !dy) camera.clearViewOffset();
+    else camera.setViewOffset(size.x, size.y, -dx, -dy, size.x, size.y);
+  }
+
+  /**
+   * How far back the camera must be, looking straight at the wall, for a box
+   * to fit the area the page's controls leave uncovered.
+   */
+  function fitDistance(box: THREE.Box3, facing: THREE.Vector3) {
+    const s = box.getSize(new THREE.Vector3());
+    const across = Math.abs(s.x * facing.z) + Math.abs(s.z * facing.x);
+    const deep = Math.abs(s.x * facing.x) + Math.abs(s.z * facing.z);
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const visibleWidth = Math.max(size.x - insets.left - insets.right, size.x * 0.2);
+    const visibleHeight = Math.max(size.y - insets.top - insets.bottom, size.y * 0.2);
+    const tanAcross = (tanHalf * visibleWidth) / size.y;
+    const tanUp = (tanHalf * visibleHeight) / size.y;
+    return Math.max(across / 2 / tanAcross, s.y / 2 / tanUp) + deep / 2;
   }
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(root);
@@ -184,20 +226,25 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     edge = typicalEdge(face.medianArea);
     const center = face.box.getCenter(new THREE.Vector3());
     const radius = face.box.getSize(new THREE.Vector3()).length() / 2;
-    const distance = radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2));
     const level = new THREE.Vector3(face.facing.x, 0, face.facing.z).normalize();
     camera.near = radius / 100;
     camera.far = radius * 100;
     camera.updateProjectionMatrix();
-    camera.position.copy(center).addScaledVector(level, distance);
+    camera.position.copy(center).addScaledVector(level, fitDistance(face.box, level) * WALL_MARGIN);
 
     controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
     controls.target.copy(center);
     controls.minDistance = radius * 0.02;
-    controls.maxDistance = distance * 3;
+    controls.maxDistance = (radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 4;
     controls.update();
-    home = { azimuth: controls.getAzimuthalAngle(), polar: controls.getPolarAngle(), target: center, distance };
+    home = {
+      azimuth: controls.getAzimuthalAngle(),
+      polar: controls.getPolarAngle(),
+      target: center,
+      box: face.box,
+      facing: level,
+    };
     applyFrontArc();
     setRoutes(pendingRoutes);
 
@@ -362,11 +409,11 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
   /** Frames a route, by default the highlighted one, or with none the whole wall. */
   function routeFrame(start: Home, uuid = highlighted) {
     const line = uuid ? (routes.get(uuid)?.line ?? []) : [];
-    if (line.length < 2) return { target: start.target, distance: start.distance };
+    if (line.length < 2) return { target: start.target, distance: fitDistance(start.box, start.facing) * WALL_MARGIN };
     const box = new THREE.Box3().setFromPoints(line);
-    const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, edge * 40);
-    const distance = (radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.25;
-    return { target: box.getCenter(new THREE.Vector3()), distance };
+    // Short routes still get some rock around them.
+    box.expandByScalar(edge * 15);
+    return { target: box.getCenter(new THREE.Vector3()), distance: fitDistance(box, start.facing) * ROUTE_MARGIN };
   }
 
   function setView(azimuthDeg: number, elevationDeg: number) {
@@ -590,6 +637,16 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     highlight(uuid) {
       highlighted = uuid;
       for (const state of routes.values()) redraw(state);
+    },
+    setInsets(next) {
+      const same =
+        next.top === insets.top &&
+        next.right === insets.right &&
+        next.bottom === insets.bottom &&
+        next.left === insets.left;
+      if (same) return;
+      insets = { ...next };
+      applyInsets();
     },
     setFrontArc(on) {
       frontArc = on;

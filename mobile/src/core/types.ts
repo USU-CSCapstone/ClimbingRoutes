@@ -55,17 +55,19 @@ export interface ClimbSummary {
   uuid: Uuid;
   name: string;
   grade: Grade | null;
+  /** Every grade OpenBeta has for the climb, by system. */
+  allGrades: Partial<Record<GradeSystem, string>>;
   disciplines: Discipline[];
+  /** First ascent, as OpenBeta records it. */
+  fa: string | null;
   leftRightIndex: number | null;
 }
 
 export interface Climb extends ClimbSummary {
   /** Ancestors from the country down to the wall the climb is on. */
   path: Crumb[];
-  allGrades: Partial<Record<GradeSystem, string>>;
   lengthMeters: number | null;
   bolts: number | null;
-  fa: string | null;
   description: string | null;
   locationText: string | null;
   protection: string | null;
