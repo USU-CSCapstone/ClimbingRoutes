@@ -51,6 +51,25 @@ export interface Area extends AreaSummary {
   climbs: ClimbSummary[];
 }
 
+/** West, south, east, north in degrees. */
+export type BBox = [number, number, number, number];
+
+/** An area or wall drawn as one dot on the map. */
+export interface MapNode {
+  uuid: Uuid;
+  name: string;
+  totalClimbs: number;
+  isLeaf: boolean;
+  location: LatLng;
+}
+
+/** What the map needs to split an area into its children. */
+export interface MapArea {
+  uuid: Uuid;
+  bbox: BBox | null;
+  children: MapNode[];
+}
+
 export interface ClimbSummary {
   uuid: Uuid;
   name: string;
