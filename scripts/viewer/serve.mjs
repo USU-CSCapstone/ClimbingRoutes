@@ -1,6 +1,7 @@
-// Serves the repo on http://localhost:8765/ so viewer/index.html can load the models in
-// data/models/ (browsers won't load them from file://). Localhost only; hidden paths such
-// as .git are refused. The one thing it writes is the viewer's saved route lines:
+// Serves data/ on http://localhost:8765/ for the app's author tool (/author in the Expo
+// app), which loads the models, OpenBeta JSON and saved route lines from it. Localhost
+// only, and only pages served from localhost, like the Expo dev server on its own port,
+// may read or save through it. The one thing it writes is the saved route lines:
 // PUT /data/routes/<model>.json. Run from anywhere: node scripts/viewer/serve.mjs [port]
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
@@ -11,6 +12,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PORT = Number(process.argv[2] || process.env.PORT || 8765);
 const HOSTS = new Set([`localhost:${PORT}`, `127.0.0.1:${PORT}`]);
+// Pages from any port on this machine, such as the Expo dev server on 8081.
+const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 const ROUTES_PATH = /^\/data\/routes\/[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
 const MAX_ROUTES_BYTES = 10 * 1024 * 1024;
 
@@ -45,7 +48,7 @@ function checkRoutes(body) {
 async function saveRoutes(req, res, path) {
   const send = (code, text) => res.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' }).end(text);
   const origin = req.headers.origin;
-  if (origin && !HOSTS.has(origin.replace(/^http:\/\//, ''))) return send(403, 'only the viewer on this server may save routes');
+  if (origin && !LOCAL_ORIGIN.test(origin)) return send(403, 'only pages served from localhost may save routes');
   if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(415, 'send the routes as application/json');
 
   const chunks = [];
@@ -88,19 +91,33 @@ const server = createServer(async (req, res) => {
     res.writeHead(400).end();
     return;
   }
+  // The author tool is served by the Expo dev server, a different origin, so it needs CORS.
+  const origin = req.headers.origin;
+  res.setHeader('Vary', 'Origin');
+  if (origin && LOCAL_ORIGIN.test(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Methods': 'GET, HEAD, PUT',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '600',
+    }).end();
+    return;
+  }
   if (req.method === 'PUT' && ROUTES_PATH.test(path)) {
     await saveRoutes(req, res, path).catch((err) => res.writeHead(500).end(String(err.message || err)));
     return;
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { Allow: 'GET, HEAD, PUT' }).end();
+    res.writeHead(405, { Allow: 'GET, HEAD, PUT, OPTIONS' }).end();
     return;
   }
   if (path === '/') {
-    res.writeHead(302, { Location: '/viewer/' }).end();
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }).end(
+      'Serving data/ for the author tool. Start the app with npx expo start in mobile/, press w, then open /author.\n',
+    );
     return;
   }
-  if (path.split('/').some((part) => part.startsWith('.'))) {
+  if (!path.startsWith('/data/') || path.split('/').some((part) => part.startsWith('.'))) {
     res.writeHead(404).end();
     return;
   }
@@ -138,5 +155,5 @@ server.on('error', (err) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Serving ${ROOT} on http://localhost:${PORT}/viewer/ (Ctrl+C to stop)`);
+  console.log(`Serving ${join(ROOT, 'data')} on http://localhost:${PORT}/data/ (Ctrl+C to stop)`);
 });

@@ -3,8 +3,9 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import type { Climb, GradeSystem } from '@/core/types';
+import { wallForArea } from '@/core/walls';
 import { useClimb } from '@/data/queries';
-import { Breadcrumb, disciplineText, GradeBadge, Loading, Message, Section } from '@/ui/components';
+import { Breadcrumb, disciplineText, GradeBadge, Loading, Message, Section, WallLink } from '@/ui/components';
 import { AppText } from '@/ui/text';
 
 const GRADE_LABELS: Record<GradeSystem, string> = {
@@ -25,6 +26,9 @@ export default function ClimbScreen() {
   if (error) return <Message title="Couldn't load this route" detail={error.message} />;
   if (!climb) return <Message title="Route not found" />;
 
+  const onWall = climb.path.at(-1);
+  const wall = onWall ? wallForArea(onWall.uuid) : null;
+
   return (
     <>
       <Stack.Screen options={{ title: climb.name }} />
@@ -37,6 +41,7 @@ export default function ClimbScreen() {
           <GradeBadge grade={climb.grade} large />
         </View>
         <Facts climb={climb} />
+        {wall ? <WallLink wall={wall} route={climb.uuid} label="See it on the 3D wall" /> : null}
         {climb.description ? (
           <Section label="Description">
             <AppText>{climb.description}</AppText>
@@ -52,7 +57,6 @@ export default function ClimbScreen() {
             <AppText>{climb.protection}</AppText>
           </Section>
         ) : null}
-        {/* Later: "View on wall (3D)" opens the wall's model fullscreen. */}
         <AppText type="small" color="textSecondary" style={styles.credit}>
           Data from OpenBeta (CC0)
         </AppText>
