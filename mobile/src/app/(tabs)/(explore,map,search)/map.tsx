@@ -7,6 +7,7 @@ import type { BBox, Uuid } from '@/core/types';
 import { useMapDots } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { climbCount, LinkRow, Message } from '@/ui/components';
+import { DOM_WEBVIEW } from '@/ui/dom';
 import { useHrefs } from '@/ui/nav';
 import WallMap from '@/ui/wall-map';
 
@@ -35,7 +36,7 @@ export default function MapScreen() {
         selected={selected}
         onSelect={async (uuid) => setSelected(uuid)}
         onViewChange={async (v) => setView(v)}
-        dom={{ style: styles.screen, scrollEnabled: false, bounces: false }}
+        dom={{ ...DOM_WEBVIEW, style: styles.screen, scrollEnabled: false, bounces: false }}
       />
       {/* The selected dot shows in a card at the bottom, within thumb reach, above the map credits. */}
       {dot ? (
