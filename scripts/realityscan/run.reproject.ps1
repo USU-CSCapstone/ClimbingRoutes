@@ -11,9 +11,14 @@
 #    model Y-up, and embeds the texture so the result is a single file.
 #  * Then, for ADR 0005, the texture is swapped for a JPEG (glb-texture.mjs) and level.mjs
 #    levels the model from the camera poses, which a second RealityScan run exports as XMP.
+#  * Alignment ignores the photos' GPS (sfmEnableCameraPrior=false). Phone GPS is metres off
+#    and crag cameras spread only a few metres, so fitting to it tilted models 35-55 degrees,
+#    and the auto region box with them. Units are then arbitrary, not metres. -set persists
+#    into later RealityScan instances, so the script turns it back on when it finishes or fails.
 #
 # Usage:  .\run.reproject.ps1                  (project "test03")
 #         .\run.reproject.ps1 -Name test04 -Triangles 500000 -Quality 80
+#         .\run.reproject.ps1 -UseGps          (fit the model to the photos' GPS, as before)
 #         .\run.reproject.ps1 -DryRun          (print the commands, run nothing)
 param(
   [string]$Name = "test03",
@@ -23,6 +28,7 @@ param(
   [int]$DenseTextures = 4,
   [string]$Imgs = "C:\Users\Garage\Downloads\test-images",
   [ValidateRange(1, 100)][int]$Quality = 85,
+  [switch]$UseGps,
   [switch]$DryRun
 )
 $ErrorActionPreference = "Stop"
@@ -80,8 +86,9 @@ if (Test-Path $Box) {
 
 # -silent and appQuitOnError make a failure exit with an error code instead of
 # leaving an error dialog open in the hidden instance.
+$prior = if ($UseGps) { "true" } else { "false" }
 $rsArgs = @("-headless", "-silent", "$Proj\crash", "-set", "appQuitOnError=true",
-            "-add", $List, "-align", "-selectMaximalComponent") + $region + @(
+            "-add", $List, "-set", "sfmEnableCameraPrior=$prior", "-align", "-selectMaximalComponent") + $region + @(
   "-calculateNormalModel",
   "-renameSelectedModel", "dense",
   "-set", "unwrapStyle=MaxTexturesCount",
@@ -95,8 +102,11 @@ $rsArgs = @("-headless", "-silent", "$Proj\crash", "-set", "appQuitOnError=true"
   "-selectModel", "low",
   "-save", "$Proj\$Name.rsproj",            # saved before export, so a failed export can be inspected
   "-exportSelectedModel", $Raw,
+  "-set", "sfmEnableCameraPrior=true",      # -set persists into later instances
   "-quit"
 )
+# An error quits before the line above, so a failed run turns GPS back on in a new instance.
+$resetArgs = @("-headless", "-silent", "$Proj\crash", "-set", "sfmEnableCameraPrior=true", "-quit")
 $camArgs = @("-headless", "-silent", "$Proj\crash", "-set", "appQuitOnError=true",
              "-load", "$Proj\$Name.rsproj", "-selectMaximalComponent", "-exportXMPForSelectedComponent", "-quit")
 
@@ -121,6 +131,7 @@ $code = $LASTEXITCODE
 $sw.Stop()
 Write-Host "RealityScan exit code: $code (elapsed $($sw.Elapsed.ToString('hh\:mm\:ss')))"
 if ($code -ne 0 -or -not (Test-Path $Raw)) {
+  if (-not $UseGps) { & $RS @resetArgs | Out-Null }
   throw "RealityScan failed. Check $Proj\crash, or open $Proj\$Name.rsproj in the GUI to see how far it got."
 }
 

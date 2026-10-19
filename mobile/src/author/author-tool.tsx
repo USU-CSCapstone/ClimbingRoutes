@@ -4,7 +4,7 @@ import type { DOMProps } from 'expo/dom';
 import { type CSSProperties, useEffect, useEffectEvent, useRef, useState } from 'react';
 
 import { STYLES } from '@/author/styles';
-import { DATA_URL } from '@/core/config';
+import { LOCAL_DATA_URL } from '@/core/config';
 import { gradeFromText, pickGrade } from '@/core/grades';
 import type { RoutesFile } from '@/core/routes-file';
 import type { Grade, GradeSystem, Uuid } from '@/core/types';
@@ -12,7 +12,7 @@ import { ROUTE_COLORS } from '@/viewer/colors';
 import type { DrapeStats, ModelInfo, SurfaceHit, Vec3, Viewer, ViewerRoute } from '@/viewer/types';
 import { createViewer } from '@/viewer/viewer';
 
-const OPENBETA_FILE = `${DATA_URL}/openbeta/date-wall.json`;
+const OPENBETA_FILE = `${LOCAL_DATA_URL}/openbeta/date-wall.json`;
 const NOT_RUNNING = 'Is scripts/viewer/serve.mjs running?';
 /** Camera angles from straight in front of the wall: [label, azimuth, elevation]. */
 const VIEWS: [string, number, number][] = [
@@ -78,7 +78,7 @@ export default function AuthorTool({
   const [models, setModels] = useState<ModelEntry[] | null>(null);
 
   useEffect(() => {
-    fetch(`${DATA_URL}/models/index.json`, { cache: 'no-store' })
+    fetch(`${LOCAL_DATA_URL}/models/index.json`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .catch(() => null)
       .then((index: { models?: ModelEntry[] } | null) => setModels(index?.models ?? []));
@@ -125,7 +125,7 @@ function Author({
 
   const entry = models.find((m) => m.file === file);
   const routesName = `${file.replace(/\.glb$/i, '')}.json`;
-  const routesUrl = `${DATA_URL}/routes/${encodeURIComponent(routesName)}`;
+  const routesUrl = `${LOCAL_DATA_URL}/routes/${encodeURIComponent(routesName)}`;
   const activeRoute = routes?.find((r) => r.uuid === active) ?? null;
 
   /** Shows a new set of routes on the model, and remembers which are hidden. */
@@ -240,7 +240,7 @@ function Author({
   useEffect(() => {
     if (!container.current) return;
     const v = createViewer(container.current, {
-      model: `${DATA_URL}/models/${encodeURIComponent(file)}`,
+      model: `${LOCAL_DATA_URL}/models/${encodeURIComponent(file)}`,
       frontArc: false,
       // Neighboring routes stay clear while drawing.
       dimOthers: false,

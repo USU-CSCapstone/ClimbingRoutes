@@ -29,7 +29,7 @@ The full list is in [docs/requirements.md](docs/requirements.md).
 | --- | --- |
 | `mobile/` | The app: Expo, Expo Router and TypeScript, for iOS, Android and web |
 | `viewer/` | Desktop web viewer for wall models, used to draw route lines |
-| `data/models/` | `index.json`, the list of models the viewer loads. The `.glb` files themselves aren't in git |
+| `data/models/` | Wall models (`.glb`) and `index.json`, the list the author tool picks from. The app loads models from `main` on GitHub, so they stay in git |
 | `data/routes/` | Route lines drawn in the viewer, one file per model |
 | `data/openbeta/` | Saved OpenBeta responses for the test wall |
 | `scripts/` | OpenBeta fetch, RealityScan pipeline, and the viewer's local server |
@@ -60,7 +60,7 @@ Then open http://localhost:8765/viewer/. Pick a model, then draw and save route 
 ### Making a wall model
 
 1. Photograph the wall using the [capture checklist](docs/capture-checklist.md)
-2. Process the photos on the team PC with `scripts/realityscan/run.reproject.ps1 -Name <wall> -Imgs <photo folder>`. After RealityScan, it fixes up the export (`glb-finish.mjs`), swaps the texture for a JPEG (`glb-texture.mjs`, `-Quality 85` by default) and levels the model from the camera poses (`level.mjs`). It prints how many photos aligned and the size against the 15 MB budget
+2. Process the photos on the team PC with `scripts/realityscan/run.reproject.ps1 -Name <wall> -Imgs <photo folder>`. After RealityScan, it fixes up the export (`glb-finish.mjs`), swaps the texture for a JPEG (`glb-texture.mjs`, `-Quality 85` by default) and levels the model from the camera poses (`level.mjs`). It prints how many photos aligned and the size against the 15 MB budget. Alignment ignores the photos' GPS, because phone GPS is metres off and fitting the model to it tilted crag models by 35-55 degrees (`-UseGps` turns it back on)
 3. Copy `C:\Users\Garage\rs\<wall>\out\<wall>.glb` to `data/models/` and add it to `index.json`
 
 ## Data
