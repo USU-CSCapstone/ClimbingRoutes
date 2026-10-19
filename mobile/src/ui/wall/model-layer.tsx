@@ -6,6 +6,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { DATA_URL } from '@/core/config';
 import type { Uuid } from '@/core/types';
 import type { Wall } from '@/core/walls';
+import { DOM_WEBVIEW } from '@/ui/dom';
 import { AppText } from '@/ui/text';
 import type { Insets, ModelInfo, ViewerRoute } from '@/viewer/types';
 
@@ -76,7 +77,7 @@ export function ModelLayer({
           onRouteTap={onRouteTap}
           onEmptyTap={onEmptyTap}
           onFps={onFps}
-          dom={{ style: styles.fill, scrollEnabled: false }}
+          dom={{ ...DOM_WEBVIEW, style: styles.fill, scrollEnabled: false }}
         />
       </Suspense>
       {status.error ? (
