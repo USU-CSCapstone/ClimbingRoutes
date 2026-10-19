@@ -60,9 +60,8 @@ Then open http://localhost:8765/viewer/. Pick a model, then draw and save route 
 ### Making a wall model
 
 1. Photograph the wall using the [capture checklist](docs/capture-checklist.md)
-2. Process the photos on the team PC with `scripts/realityscan/run.reproject.ps1`
-3. Fix up the export with `node scripts/realityscan/glb-finish.mjs <in.glb> <out.glb>`
-4. Copy the GLB to `data/models/` and add it to `index.json`
+2. Process the photos on the team PC with `scripts/realityscan/run.reproject.ps1 -Name <wall> -Imgs <photo folder>`. After RealityScan, it fixes up the export (`glb-finish.mjs`), swaps the texture for a JPEG (`glb-texture.mjs`, `-Quality 85` by default) and levels the model from the camera poses (`level.mjs`). It prints how many photos aligned and the size against the 15 MB budget
+3. Copy `C:\Users\Garage\rs\<wall>\out\<wall>.glb` to `data/models/` and add it to `index.json`
 
 ## Data
 

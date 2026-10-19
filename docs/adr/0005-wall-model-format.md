@@ -34,7 +34,7 @@ Each wall is one self-contained GLB in `data/models/`, made by `scripts/realitys
 
 - A 300k-triangle model with one 8K JPEG comes to about 12 MB and fits the budget
 - The two models in the repo don't fit yet. `crag16.glb` is 38 MB with a PNG texture, and `wall47.glb` is 35 MB with two 8K JPEGs and 1M triangles. They need their textures and geometry compressed (#37)
-- The pipeline doesn't convert textures to JPEG yet. That step has to be added to the export settings or to `glb-finish.mjs`
+- `run.reproject.ps1` re-encodes the texture as a quality-85 JPEG and swaps it in with `glb-texture.mjs`, then levels the model from the camera poses with `level.mjs`. It warns when the result is over 15 MB
 - JPEG only shrinks the download. On the phone, each 8K texture still takes about 358 MB of GPU memory, which older phones may not have. KTX2 (#37) is the fix if #34 shows trouble
 - Every reconstruction has its own coordinate system, so rebuilding a wall's model means redrawing its routes. Changing only the texture doesn't
 - Texturing before simplifying makes each run take longer
