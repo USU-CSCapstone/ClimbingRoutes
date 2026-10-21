@@ -1,6 +1,5 @@
 // The route lines drawn on one model, saved by the author tool to
 // data/routes/<model>.json. scripts/viewer/serve.mjs checks the shape on save.
-import { DATA_URL } from './config';
 import type { Uuid } from './types';
 
 /** A point or direction in model units, as [x, y, z]. */
@@ -28,9 +27,16 @@ export interface SavedRoute {
   normals: Vec3[];
 }
 
-/** The lines saved for a model, or null if none have been drawn on it yet. */
-export async function fetchRoutesFile(file: string, signal?: AbortSignal): Promise<RoutesFile | null> {
-  const res = await fetch(`${DATA_URL}/routes/${encodeURIComponent(file)}`, { cache: 'no-store', signal });
+/**
+ * The lines saved for a model, or null if none have been drawn on it yet.
+ * `dataUrl` is the data/ folder to read from, like DATA_URL in config.ts.
+ */
+export async function fetchRoutesFile(
+  dataUrl: string,
+  file: string,
+  signal?: AbortSignal,
+): Promise<RoutesFile | null> {
+  const res = await fetch(`${dataUrl}/routes/${encodeURIComponent(file)}`, { cache: 'no-store', signal });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Couldn't load the route lines (HTTP ${res.status})`);
   return (await res.json()) as RoutesFile;

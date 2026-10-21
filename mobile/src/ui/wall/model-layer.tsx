@@ -3,9 +3,10 @@ import { lazy, Suspense } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
-import { DATA_URL } from '@/core/config';
+import { LOCAL_DATA_URL } from '@/core/config';
 import type { Uuid } from '@/core/types';
 import type { Wall } from '@/core/walls';
+import { WALL_DATA_URL } from '@/data/queries';
 import { DOM_WEBVIEW } from '@/ui/dom';
 import { AppText } from '@/ui/text';
 import type { Insets, ModelInfo, ViewerRoute } from '@/viewer/types';
@@ -66,7 +67,7 @@ export function ModelLayer({
       <Suspense fallback={null}>
         <WallViewer
           key={status.attempt}
-          model={`${DATA_URL}/models/${encodeURIComponent(wall.model)}`}
+          model={`${WALL_DATA_URL}/models/${encodeURIComponent(wall.model)}`}
           routes={lines}
           highlighted={highlighted}
           insets={insets}
@@ -89,7 +90,7 @@ export function ModelLayer({
           <AppText type="small" style={styles.detail} numberOfLines={3}>
             {status.error}
           </AppText>
-          {__DEV__ ? (
+          {WALL_DATA_URL === LOCAL_DATA_URL ? (
             <AppText type="small" style={styles.detail}>
               Models come from the data server. Start it from the repo root with node scripts/viewer/serve.mjs
             </AppText>
