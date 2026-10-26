@@ -2,12 +2,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { type ComponentProps, type ReactElement, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
+  type ListViewToken,
   Pressable,
   type StyleProp,
   StyleSheet,
   View,
   type ViewStyle,
-  type ViewToken,
 } from 'react-native';
 
 import { Colors, Difficulty, Spacing, TapTarget, UngradedLine } from '@/constants/theme';
@@ -244,7 +244,7 @@ export function RouteList({
   // FlatList throws if this handler ever changes, so keep the first one (state survives hot reloads).
   const [onViewableItemsChanged] = useState(
     () =>
-      ({ viewableItems }: { viewableItems: ViewToken<ShownRoute>[] }) => {
+      ({ viewableItems }: { viewableItems: ListViewToken[] }) => {
         visible.current = new Set(viewableItems.map((v) => v.key));
       },
   );
