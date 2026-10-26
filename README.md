@@ -37,7 +37,7 @@ The full list is in [docs/requirements.md](docs/requirements.md).
 
 ## Getting started
 
-Needs Node 20 or newer. Works the same on Mac and Windows.
+Needs Node 22.13+, 24.3+ or 26+ (Expo SDK 58). Works the same on Mac and Windows.
 
 ### App
 
@@ -47,7 +47,7 @@ npm install
 npx expo start
 ```
 
-Press `w` for web, or scan the QR code with Expo Go on a phone on the same Wi-Fi. If the network blocks it, use `npx expo start --tunnel`. More in [mobile/README.md](mobile/README.md).
+Press `w` for web, or scan the QR code with Expo Go on a phone on the same Wi-Fi. If the network blocks it, run `npx expo login` once, then `npx expo start --tunnel`. More in [mobile/README.md](mobile/README.md).
 
 ### 3D viewer
 

@@ -4,7 +4,7 @@ Expo app (iOS, Android, web) for browsing and searching OpenBeta climbing data. 
 
 ## Run
 
-Needs Node 20 or newer. Works the same on Mac and Windows.
+Needs Node 22.13+, 24.3+ or 26+ (Expo SDK 58). Works the same on Mac and Windows.
 
 ```
 cd mobile
@@ -13,7 +13,7 @@ npx expo start
 ```
 
 - **Web:** press `w`, or open http://localhost:8081
-- **iPhone:** install Expo Go, then scan the QR code with the Camera app. Phone and computer must be on the same Wi-Fi. If the school network blocks it, run `npx expo start --tunnel`
+- **iPhone:** install Expo Go, then scan the QR code with the Camera app. Expo Go must be the version for SDK 58. Phone and computer must be on the same Wi-Fi. If the school network blocks it, run `npx expo login` once, then `npx expo start --tunnel`
 
 Before pushing:
 
