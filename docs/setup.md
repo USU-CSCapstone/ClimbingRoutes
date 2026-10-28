@@ -72,7 +72,9 @@ Never put the secret key (`sb_secret_…`) in the app or the repo. It belongs on
 
 ## Draw route lines
 
-The `/author` tool draws lines on a model in `data/models/` and saves them to `data/routes/`. Development only, in a desktop browser. From the repo root, with the app running:
+**Not working right now.** The tool loads its models from `data/models/`, which was removed when the models moved to Supabase storage. It will load them from Supabase instead.
+
+The `/author` tool draws lines on a model and saves them to `data/routes/`. Development only, in a desktop browser. From the repo root, with the app running:
 
 ```
 node scripts/viewer/serve.mjs
@@ -80,7 +82,7 @@ node scripts/viewer/serve.mjs
 
 Open http://localhost:8081/author, pick a route, click **Draw**, and click holds from the start upward. **Save routes** writes `data/routes/<model>.json`.
 
-To publish a wall that has no model yet, with its lines, as v1: from `supabase/`, run `npm run seed -- ../data/routes/<model>.json`. Date Wall is already published this way.
+To publish a wall that has no model yet, with its lines, as v1: from `supabase/`, run `npm run seed -- ../data/routes/<model>.json`. Date Wall is already published this way. The script also reads the model from `data/models/`, so it needs the same change before it works again.
 
 ## Make a wall model
 

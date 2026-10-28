@@ -1,11 +1,9 @@
 # Data
 
-Working copies of wall models and the route lines drawn on them. The route drawing tool (`/author`) reads and saves these files, and walls are published from them to the team's Supabase project, where the app loads them from ([ADR 0006](../docs/adr/0006-supabase-backend.md)).
+Route lines drawn on wall models, and saved OpenBeta data, for the route drawing tool (`/author`). The models themselves live in the team's Supabase storage, which is also where the app loads models and route lines from ([ADR 0006](../docs/adr/0006-supabase-backend.md)). They used to be in a `models/` folder here, removed once they moved to Supabase.
 
 | Path | What's there |
 | --- | --- |
-| `models/` | Wall models, one self-contained `.glb` per reconstruction ([ADR 0005](../docs/adr/0005-wall-model-format.md)) |
-| `models/index.json` | The models the author tool (`/author`) offers |
 | `routes/` | Route lines drawn on a model, in `<model>.json` |
 | `openbeta/` | A saved OpenBeta response for the test wall, from `scripts/openbeta/fetch-date-wall.mjs` ([openbeta.md](../docs/openbeta.md)). The author tool's route list comes from it |
 
@@ -13,27 +11,9 @@ Working copies of wall models and the route lines drawn on them. The route drawi
 
 Date Wall in Logan Canyon, Utah, is the only wall with a model so far. It was the proof of concept's test wall. To open it in the app, see [Things to try](../docs/setup.md#things-to-try).
 
-| Model | Made from | Routes drawn | Used by |
-| --- | --- | --- | --- |
-| `wall47.glb` | Date Wall, 47 photos. 36 MB, 1M triangles, two 8K JPEG textures | Smitten, Hooked, NCMO | Published as Date Wall's v1, which the Date Wall page shows |
-| `crag16.glb` | Date Wall, 16 photos. 40 MB, 300k triangles, one 8K PNG texture | Hooked, NCMO | Only `/author`, for comparison |
-| `wallpics01.glb` | Not recorded. 14 MB, 300k triangles, one JPEG texture | None | Only `/author` |
+Its model is published in Supabase as Date Wall's v1: 47 photos, 36 MB, 1M triangles and two 8K JPEG textures, with Smitten, Hooked and NCMO drawn (`routes/wall47.json`). `routes/crag16.json` holds lines for an earlier 16-photo model that was only used for comparison.
 
 Date Wall has six routes on OpenBeta. Trix, The Flirt and Twitterpation aren't drawn, because they can't be placed on the current model (#35).
-
-## models/index.json
-
-```json
-{
-  "models": [
-    { "file": "wall47.glb", "name": "Date Wall · 47 photos (sets 16 + 31)", "notes": "1M triangles, two 8K textures" }
-  ]
-}
-```
-
-- `file`: the GLB in `models/`
-- `name`: what the author tool's model picker shows. Optional, and the file name is used without it
-- `notes`: shown under the model's stats in the author tool. Optional
 
 ## routes/\<model\>.json
 
@@ -56,18 +36,14 @@ Written by the author tool and checked by `scripts/viewer/serve.mjs` when it sav
 }
 ```
 
+- `model` names the model the lines were drawn on. It's a path into the old `models/` folder, so for now it only identifies the model
 - `points` are the holds the author clicked, from the start upward, in the model's own coordinates. `normals` point out of the rock at each one
 - Every reconstruction has its own coordinates, so a routes file only fits the model it was drawn on. Rebuilding a wall's model means redrawing its routes
 - Routes are matched to OpenBeta by `openbeta_uuid`, so a renamed route keeps its line
 
 ## Adding a wall
 
-1. **Photograph it** with the [capture checklist](../docs/capture-checklist.md)
-2. **Make the model** with `scripts/realityscan/run.reproject.ps1` ([Make a wall model](../docs/setup.md#make-a-wall-model)) and copy the finished `.glb` into `models/`. Keep it to 15 MB or less
-3. **List it** in `models/index.json`
-4. **Draw the routes.** Start the author tool ([Drawing routes](../mobile/README.md#drawing-routes)), open `http://localhost:8081/author?model=<file>.glb`, draw each route and click **Save routes**. That writes `routes/<file>.json`. The author tool's route list comes from `openbeta/date-wall.json`, so today it only lists Date Wall's routes. A new wall needs the tool to load that wall's routes first, which isn't built yet
-5. **Publish it** as the wall's first version: from `supabase/`, run `npm run seed -- ../data/routes/<file>.json`. It signs in as the moderator account ([Backend setup](../docs/setup.md#backend)), uploads the model and adds its route lines. The routes file's `area.openbeta_uuid` says which wall it is, and a wall that already has a version is left alone. Once published, the wall's area page offers "View in 3D" and the map marks it 3D
-6. **Check it** at `http://localhost:8081/walls/<area uuid>`, then open a pull request with the files in `data/` so the drawing tool has them
+The route drawing tool and `npm run seed` both read models from the old `models/` folder, so adding a new wall waits until they load models from Supabase storage instead. Photographing a wall and making its model work as before: see the [capture checklist](../docs/capture-checklist.md) and [Make a wall model](../docs/setup.md#make-a-wall-model).
 
 ## Fixing route details
 

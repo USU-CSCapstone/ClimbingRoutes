@@ -40,13 +40,12 @@ The full list is in [docs/requirements.md](docs/requirements.md).
 | Path | What's there |
 | --- | --- |
 | `mobile/` | The app: Expo, Expo Router and TypeScript, for iOS, Android and web. Includes the route drawing tool at `/author` |
-| `data/models/` | Wall models (`.glb`) for the route drawing tool, and `index.json`, its list. The app loads published models from Supabase |
 | `data/routes/` | Route lines saved by the drawing tool, one file per model |
 | `data/openbeta/` | Saved OpenBeta responses for the test wall |
 | `scripts/` | OpenBeta fetch, RealityScan pipeline, and the drawing tool's local server |
 | `supabase/` | Backend: database tables and access rules, the seed script and access checks |
 | `docs/` | Requirements, architecture, decisions and project notes |
-| `.github/` | CI, and the issue and pull request templates |
+| `.github/` | CI |
 
 ## Getting started
 

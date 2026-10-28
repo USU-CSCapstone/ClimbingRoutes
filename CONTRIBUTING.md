@@ -43,7 +43,7 @@ CI runs the same three on every pull request. There are no automated tests yet, 
 
 ## Reporting bugs and ideas
 
-Open an issue with the bug or feature template. For a bug, say what device, browser or OS you were on, and the wall or route if it's about one.
+Open an issue. For a bug, say what device, browser or OS you were on, and the wall or route if it's about one.
 
 ## Conduct
 

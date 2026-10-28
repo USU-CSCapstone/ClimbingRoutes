@@ -44,13 +44,15 @@ Settings are constants in `src/core/config.ts`. The keys there are public by des
 
 ## Drawing routes
 
-The author tool at `/author` draws route lines on a wall's model and saves them to `data/routes/`. It only exists in development, in a desktop browser. It reads and saves through a small server for the repo's `data/` folder, so run that too, from the repo root:
+The author tool at `/author` draws route lines on a wall's model and saves them to `data/routes/`. It isn't working right now: it loads models from `data/models/`, which was removed when the models moved to Supabase storage, and it will load them from Supabase instead.
+
+It only exists in development, in a desktop browser. It reads and saves through a small server for the repo's `data/` folder, so run that too, from the repo root:
 
 ```
 node scripts/viewer/serve.mjs
 ```
 
-Then open http://localhost:8081/author. `?model=crag16.glb` picks a model from `data/models/index.json`. Pick a route, click **Draw**, and click holds from the start upward. **Save routes** writes `data/routes/<model>.json`; commit that file to share the lines. To publish a wall with its lines, see [docs/setup.md](../docs/setup.md#draw-route-lines).
+Then open http://localhost:8081/author. Pick a route, click **Draw**, and click holds from the start upward. **Save routes** writes `data/routes/<model>.json`; commit that file to share the lines. To publish a wall with its lines, see [docs/setup.md](../docs/setup.md#draw-route-lines).
 
 ## Layout
 
