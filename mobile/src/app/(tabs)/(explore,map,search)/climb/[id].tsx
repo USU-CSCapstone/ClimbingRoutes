@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import type { Climb, GradeSystem } from '@/core/types';
-import { wallForArea } from '@/core/walls';
+import { useHasModel } from '@/data/models';
 import { useClimb } from '@/data/queries';
 import { Breadcrumb, disciplineText, GradeBadge, Loading, Message, Section, WallLink } from '@/ui/components';
 import { AppText } from '@/ui/text';
@@ -21,13 +21,13 @@ const GRADE_LABELS: Record<GradeSystem, string> = {
 export default function ClimbScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: climb, isPending, error } = useClimb(id);
+  const hasModel = useHasModel(climb?.path.at(-1)?.uuid);
 
   if (isPending) return <Loading />;
   if (error) return <Message title="Couldn't load this route" detail={error.message} />;
   if (!climb) return <Message title="Route not found" />;
 
   const onWall = climb.path.at(-1);
-  const wall = onWall ? wallForArea(onWall.uuid) : null;
 
   return (
     <>
@@ -41,7 +41,7 @@ export default function ClimbScreen() {
           <GradeBadge grade={climb.grade} large />
         </View>
         <Facts climb={climb} />
-        {wall ? <WallLink wall={wall} route={climb.uuid} label="See it on the 3D wall" /> : null}
+        {onWall && hasModel ? <WallLink wallUuid={onWall.uuid} route={climb.uuid} label="See it on the 3D wall" /> : null}
         {climb.description ? (
           <Section label="Description">
             <AppText>{climb.description}</AppText>

@@ -3,10 +3,10 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing, TapTarget } from '@/constants/theme';
-import { useSession, useSignIn, useSignOut } from '@/data/auth';
+import { useProfile, useSession, useSignIn, useSignOut } from '@/data/auth';
 import { supabaseConfigured } from '@/data/supabase';
 import { useTheme } from '@/hooks/use-theme';
-import { Loading, Message } from '@/ui/components';
+import { LinkRow, Loading, Message } from '@/ui/components';
 import { AppText } from '@/ui/text';
 
 export default function ProfileScreen() {
@@ -39,11 +39,17 @@ export default function ProfileScreen() {
 
 function SignedIn({ email }: { email: string }) {
   const signOut = useSignOut();
+  const { profile } = useProfile();
   return (
     <View style={styles.page}>
       <View style={styles.flex}>
         <AppText type="title">Profile</AppText>
         <AppText color="textSecondary">Signed in as {email}</AppText>
+        {profile?.is_moderator ? (
+          <View style={styles.tools}>
+            <LinkRow href="/moderate" title="Moderator tools" subtitle="Review models and draw routes" />
+          </View>
+        ) : null}
       </View>
       {signOut.error ? <AppText color="danger">{signOut.error.message}</AppText> : null}
       <Button label="Sign out" busy={signOut.isPending} onPress={() => signOut.mutate()} secondary />
@@ -145,6 +151,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   form: { gap: Spacing.two },
+  tools: { marginTop: Spacing.three, marginHorizontal: -Spacing.three },
   input: { minHeight: TapTarget, borderRadius: 12, paddingHorizontal: Spacing.three, fontSize: 18 },
   button: { minHeight: TapTarget, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontWeight: '700' },

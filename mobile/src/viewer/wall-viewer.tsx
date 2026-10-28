@@ -4,12 +4,14 @@ import type { DOMProps } from 'expo/dom';
 import { useEffect, useEffectEvent, useRef } from 'react';
 
 import type { Uuid } from '@/core/types';
-import type { Insets, ModelInfo, Viewer, ViewerRoute } from '@/viewer/types';
+import type { Insets, ModelCacheKey, ModelInfo, Viewer, ViewerRoute } from '@/viewer/types';
 import { createViewer } from '@/viewer/viewer';
 
 export interface WallViewerProps {
   /** URL of the wall's GLB. */
   model: string;
+  /** Keep the file on the device under this key. Should change only when `model` does. */
+  cache?: ModelCacheKey;
   routes: ViewerRoute[];
   /** Route to highlight. The others dim and the camera flies to it. */
   highlighted?: Uuid | null;
@@ -35,6 +37,7 @@ export interface WallViewerProps {
  */
 export default function WallViewer({
   model,
+  cache,
   routes,
   highlighted = null,
   frontArc = true,
@@ -63,6 +66,7 @@ export default function WallViewer({
     if (!container.current) return;
     const v = createViewer(container.current, {
       model,
+      cache,
       onProgress: (fraction) => progressed(fraction),
       onLoad: (info) => loaded(info),
       onError: (error) => failed(error.message),
@@ -75,6 +79,8 @@ export default function WallViewer({
       v.dispose();
       viewer.current = null;
     };
+    // The cache key belongs to the model URL, so a new key alone doesn't reload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model]);
 
   useEffect(() => viewer.current?.setRoutes(routes), [model, routes]);

@@ -29,7 +29,7 @@ The full list is in [docs/requirements.md](docs/requirements.md).
 | --- | --- |
 | `mobile/` | The app: Expo, Expo Router and TypeScript, for iOS, Android and web |
 | `viewer/` | Desktop web viewer for wall models, used to draw route lines |
-| `data/models/` | Wall models (`.glb`) and `index.json`, the list the author tool picks from. The app loads models from `main` on GitHub, so they stay in git |
+| `data/models/` | Wall models (`.glb`) and `index.json`, the list the author tool picks from. The app loads published models from Supabase instead |
 | `data/routes/` | Route lines drawn in the viewer, one file per model |
 | `data/openbeta/` | Saved OpenBeta responses for the test wall |
 | `scripts/` | OpenBeta fetch, RealityScan pipeline, and the viewer's local server |

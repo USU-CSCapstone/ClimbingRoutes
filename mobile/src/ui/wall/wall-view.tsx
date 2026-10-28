@@ -7,8 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Difficulty, SerifFont, Spacing, UngradedLine } from '@/constants/theme';
 import { difficultyBand } from '@/core/grades';
 import type { Grade, Uuid } from '@/core/types';
-import { type Wall, wallRoutes } from '@/core/walls';
-import { useArea, useRoutesFile } from '@/data/queries';
+import type { PublishedModel } from '@/core/models';
+import { wallRoutes } from '@/core/walls';
+import { useRouteLines } from '@/data/models';
+import { useArea } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { AppText } from '@/ui/text';
 import { ModelLayer, type ModelStatus, VIEWER_BACKGROUND } from '@/ui/wall/model-layer';
@@ -25,7 +27,7 @@ import {
 import { CARD_HEIGHT, RouteCard } from '@/ui/wall/route-card';
 import { RouteStrip, stripHeight } from '@/ui/wall/route-strip';
 import { RoutesSheet } from '@/ui/wall/routes-sheet';
-import type { ShownRoute } from '@/ui/wall/types';
+import type { ShownRoute, WallInfo } from '@/ui/wall/types';
 import type { Insets, ViewerRoute } from '@/viewer/types';
 
 /** From this width the routes sit in a panel beside the model instead of along the bottom. */
@@ -44,10 +46,12 @@ const EDGE = Spacing.three;
  */
 export function WallView({
   wall,
+  model,
   selected,
   onSelect,
 }: {
-  wall: Wall;
+  wall: WallInfo;
+  model: PublishedModel;
   selected: Uuid | null;
   onSelect: (uuid: Uuid | null) => void;
 }) {
@@ -55,17 +59,18 @@ export function WallView({
   const { width } = useWindowDimensions();
   const safe = useSafeAreaInsets();
   const wide = width >= WIDE;
-  const area = useArea(wall.areaUuid);
-  const saved = useRoutesFile(wall.routes);
+  const area = useArea(wall.uuid);
+  const saved = useRouteLines(model.id);
   const [status, setStatus] = useState<ModelStatus>({ attempt: 0, percent: null, info: null, error: null });
   const [fps, setFps] = useState<number | null>(null);
   const [wholeWall, setWholeWall] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const linesKnown = saved.isSuccess;
+  // A copy saved on the device counts, so a wall that has loaded once works offline.
+  const linesKnown = saved.data !== undefined;
   // Wait for OpenBeta's order so each route keeps its number.
   const routes: ShownRoute[] = area.data
-    ? wallRoutes(area.data.climbs, saved.data?.routes ?? []).map((r) => ({ ...r, color: lineColor(r.grade) }))
+    ? wallRoutes(area.data.climbs, saved.data ?? []).map((r) => ({ ...r, color: lineColor(r.grade) }))
     : [];
   const lines: ViewerRoute[] = routes.flatMap((r) =>
     r.line
@@ -101,7 +106,7 @@ export function WallView({
 
   function back() {
     if (router.canGoBack()) router.back();
-    else router.replace(`/(tabs)/(explore)/area/${wall.areaUuid}` as Href);
+    else router.replace(`/(tabs)/(explore)/area/${wall.uuid}` as Href);
   }
 
   function retry() {
@@ -131,7 +136,7 @@ export function WallView({
       <Stack.Screen options={{ title: wall.name }} />
       <StatusBar style="light" />
       <ModelLayer
-        wall={wall}
+        model={model}
         lines={lines}
         highlighted={selectedRoute?.line ? selectedRoute.uuid : null}
         insets={insets}
