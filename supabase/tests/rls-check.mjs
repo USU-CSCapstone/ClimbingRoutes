@@ -12,6 +12,15 @@ const FIXTURE_WALL = "00000000-0000-4000-8000-00000000c0de";
 const PHOTO = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]); // an empty JPEG
 const results = [];
 
+// The errors a refusal comes back as. Anything else, like a network or sign-in failure, fails the check
+// instead of passing it.
+const DENIED = new Set([
+  "42501", // a row-level security policy, or no privilege on the table or column
+  "P0001", // raised by our own triggers
+  "AccessDenied", // Storage: a policy refused the write
+  "NoSuchKey", // Storage: a file the caller may not read looks missing
+]);
+
 const anon = client();
 const { supabase: user, user: regular } = await signedIn("REGULAR");
 const { supabase: mod, user: moderator } = await signedIn("MODERATOR");
@@ -174,9 +183,9 @@ async function run() {
   }
 }
 
-/** Passes if the call was refused: an error, or no rows because RLS hid them. */
+/** Passes if the call was refused: an expected denial error, or no rows because RLS hid them. */
 function blocked(res) {
-  if (res.error) return true;
+  if (res.error) return DENIED.has(res.error.code) || `unexpected error: ${res.error.code ?? res.error.name}: ${res.error.message}`;
   if (Array.isArray(res.data) && res.data.length === 0) return true;
   return `allowed: ${JSON.stringify(res.data).slice(0, 200)}`;
 }

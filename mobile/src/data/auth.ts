@@ -45,13 +45,14 @@ export function useProfile() {
       return data;
     },
     enabled: userId != null,
-    // Changes only when someone edits it in SQL.
-    staleTime: Infinity,
+    // Refetched whenever a screen using it opens, so a role set in SQL shows up without signing out.
+    staleTime: 0,
   });
   return {
     profile: userId ? (query.data ?? null) : null,
     loading: loading || (userId != null && query.isPending),
     error: query.error,
+    refetch: query.refetch,
   };
 }
 

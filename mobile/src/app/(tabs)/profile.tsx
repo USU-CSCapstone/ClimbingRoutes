@@ -39,12 +39,18 @@ export default function ProfileScreen() {
 
 function SignedIn({ email }: { email: string }) {
   const signOut = useSignOut();
-  const { profile } = useProfile();
+  const { profile, error, refetch } = useProfile();
   return (
     <View style={styles.page}>
       <View style={styles.flex}>
         <AppText type="title">Profile</AppText>
         <AppText color="textSecondary">Signed in as {email}</AppText>
+        {error ? (
+          <View style={styles.notice}>
+            <AppText color="danger">{error.message}</AppText>
+            <Button label="Try again" onPress={() => refetch()} secondary />
+          </View>
+        ) : null}
         {profile?.is_moderator ? (
           <View style={styles.tools}>
             <LinkRow href="/moderate" title="Moderator tools" subtitle="Review models and draw routes" />
@@ -75,7 +81,10 @@ function SignInForm() {
       <View style={styles.form}>
         <TextInput
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => {
+            setEmail(text);
+            signIn.reset();
+          }}
           placeholder="Email"
           placeholderTextColor={theme.textSecondary}
           autoCapitalize="none"
@@ -88,7 +97,10 @@ function SignInForm() {
         />
         <TextInput
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(text) => {
+            setPassword(text);
+            signIn.reset();
+          }}
           placeholder="Password"
           placeholderTextColor={theme.textSecondary}
           secureTextEntry
@@ -152,6 +164,7 @@ const styles = StyleSheet.create({
   },
   form: { gap: Spacing.two },
   tools: { marginTop: Spacing.three, marginHorizontal: -Spacing.three },
+  notice: { marginTop: Spacing.three, gap: Spacing.two },
   input: { minHeight: TapTarget, borderRadius: 12, paddingHorizontal: Spacing.three, fontSize: 18 },
   button: { minHeight: TapTarget, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   buttonText: { fontWeight: '700' },

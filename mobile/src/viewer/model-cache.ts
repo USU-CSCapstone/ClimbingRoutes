@@ -1,8 +1,9 @@
 // Model files kept in the browser's IndexedDB, so each version downloads once.
 // It runs where the viewer runs: the browser on web, and the DOM component's
 // webview on iOS and Android, which in Expo Go can't read files the app saved.
-// Versions never change, so a saved copy is always right; only the newest copy
-// per wall is kept.
+// Versions never change, so a saved GLB stays right; only the newest copy per
+// wall is kept. Anything that isn't a GLB, like a Wi-Fi sign-in page, is never
+// saved or reused.
 import type { ModelCacheKey } from '@/viewer/types';
 
 const DB_NAME = 'climbing-routes';
@@ -27,14 +28,23 @@ export async function loadModelBytes(
   try {
     if (db && cache) {
       const saved = await request<Saved | undefined>(db, 'readonly', (s) => s.get(cache.key)).catch(() => undefined);
-      if (saved?.bytes) return { bytes: saved.bytes, fromCache: true };
+      if (saved?.bytes && isGlb(saved.bytes)) return { bytes: saved.bytes, fromCache: true };
     }
     const bytes = await download(url, onProgress, signal);
+    if (!isGlb(bytes)) {
+      throw new Error("The download wasn't a 3D model. If this Wi-Fi has a sign-in page, sign in and try again.");
+    }
     if (db && cache) await save(db, cache, bytes).catch(() => {});
     return { bytes, fromCache: false };
   } finally {
     db?.close();
   }
+}
+
+/** True if the bytes start like a GLB file, with the ASCII magic "glTF". */
+function isGlb(bytes: ArrayBuffer): boolean {
+  const head = new Uint8Array(bytes, 0, Math.min(4, bytes.byteLength));
+  return head.length === 4 && head[0] === 0x67 && head[1] === 0x6c && head[2] === 0x54 && head[3] === 0x46;
 }
 
 async function download(url: string, onProgress: (loaded: number, total: number) => void, signal: AbortSignal) {
