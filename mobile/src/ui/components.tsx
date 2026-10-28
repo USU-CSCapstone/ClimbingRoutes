@@ -5,7 +5,6 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Spacing, TapTarget } from '@/constants/theme';
 import type { Crumb, Discipline, Grade, Uuid } from '@/core/types';
-import type { Wall } from '@/core/walls';
 import { useTheme } from '@/hooks/use-theme';
 import { useHrefs } from '@/ui/nav';
 import { AppText } from '@/ui/text';
@@ -116,9 +115,9 @@ export function Breadcrumb({ path }: { path: Crumb[] }) {
 }
 
 /** Opens a wall's 3D model, with one of its routes selected if given. */
-export function WallLink({ wall, route, label }: { wall: Wall; route?: Uuid; label: string }) {
+export function WallLink({ wallUuid, route, label }: { wallUuid: Uuid; route?: Uuid; label: string }) {
   const theme = useTheme();
-  const href = (route ? `/walls/${wall.id}?route=${route}` : `/walls/${wall.id}`) as Href;
+  const href = (route ? `/walls/${wallUuid}?route=${route}` : `/walls/${wallUuid}`) as Href;
   return (
     <Pressable
       role="link"

@@ -18,6 +18,7 @@ export default function TabLayout() {
       <Tabs.Screen name="(explore)" options={{ title: 'Explore', tabBarIcon: tabIcon('compass') }} />
       <Tabs.Screen name="(map)" options={{ title: 'Map', tabBarIcon: tabIcon('map') }} />
       <Tabs.Screen name="(search)" options={{ title: 'Search', tabBarIcon: tabIcon('search') }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: tabIcon('person-circle') }} />
       {/* Saved comes after v1. */}
       <Tabs.Screen name="saved" options={{ title: 'Saved', href: null }} />
     </Tabs>

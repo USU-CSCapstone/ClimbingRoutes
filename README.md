@@ -14,12 +14,14 @@ USU Computer Science capstone project.
 - Browse the USA from state to area to wall
 - Map of the USA that groups walls into their areas when zoomed out, with walls that have a 3D model marked
 - Route pages with grade, type, length, bolts, description and first ascent when OpenBeta has them
+- 3D wall models with each route drawn on the rock, numbered to match the route list. Date Wall in Logan Canyon is the first
+- Team accounts, with a moderator account that will review new models
 
 **Planned**
 
+- Photographing a wall in the app, with models built on the team PC and published after review
 - Saved routes, grade preferences and filters
 - Offline areas for crags with no signal
-- 3D wall models with each route drawn on the rock, numbered to match the route list
 
 The full list is in [docs/requirements.md](docs/requirements.md).
 
@@ -28,18 +30,16 @@ The full list is in [docs/requirements.md](docs/requirements.md).
 | Path | What's there |
 | --- | --- |
 | `mobile/` | The app: Expo, Expo Router and TypeScript, for iOS, Android and web |
-| `viewer/` | Desktop web viewer for wall models, used to draw route lines |
-| `data/models/` | Wall models (`.glb`) and `index.json`, the list the author tool picks from. The app loads models from `main` on GitHub, so they stay in git |
-| `data/routes/` | Route lines drawn in the viewer, one file per model |
+| `data/models/` | Wall models (`.glb`) for the route drawing tool, and `index.json`, its list. The app loads published models from Supabase |
+| `data/routes/` | Route lines saved by the drawing tool, one file per model |
 | `data/openbeta/` | Saved OpenBeta responses for the test wall |
-| `scripts/` | OpenBeta fetch, RealityScan pipeline, and the viewer's local server |
+| `scripts/` | OpenBeta fetch, RealityScan pipeline, and the drawing tool's local server |
+| `supabase/` | Backend: database tables and access rules, the seed script and access checks |
 | `docs/` | Requirements, decisions and project notes |
 
 ## Getting started
 
-Needs Node 22.13+, 24.3+ or 26+ (Expo SDK 58). Works the same on Mac and Windows.
-
-### App
+Needs Node 22.13+, 24.3+ or 26+.
 
 ```
 cd mobile
@@ -47,21 +47,9 @@ npm install
 npx expo start
 ```
 
-Press `w` for web, or scan the QR code with Expo Go on a phone on the same Wi-Fi. If the network blocks it, run `npx expo login` once, then `npx expo start --tunnel`. More in [mobile/README.md](mobile/README.md).
+Press `w` for web, or scan the QR code with Expo Go (SDK 58) on a phone on the same Wi-Fi. The app already points at the team's backend, so there's nothing else to set up to browse.
 
-### 3D viewer
-
-```
-node scripts/viewer/serve.mjs
-```
-
-Then open http://localhost:8765/viewer/. Pick a model, then draw and save route lines.
-
-### Making a wall model
-
-1. Photograph the wall using the [capture checklist](docs/capture-checklist.md)
-2. Process the photos on the team PC with `scripts/realityscan/run.reproject.ps1 -Name <wall> -Imgs <photo folder>`. After RealityScan, it fixes up the export (`glb-finish.mjs`), swaps the texture for a JPEG (`glb-texture.mjs`, `-Quality 85` by default) and levels the model from the camera poses (`level.mjs`). It prints how many photos aligned and the size against the 15 MB budget. Alignment ignores the photos' GPS, because phone GPS is metres off and fitting the model to it tilted crag models by 35-55 degrees (`-UseGps` turns it back on)
-3. Copy `C:\Users\Garage\rs\<wall>\out\<wall>.glb` to `data/models/` and add it to `index.json`
+Everything else, including the backend, the route drawing tool and making wall models on the team PC, is in [docs/setup.md](docs/setup.md).
 
 ## Data
 
@@ -69,8 +57,10 @@ Route and area data comes from [OpenBeta](https://openbeta.io) and is CC0. Cover
 
 ## Docs
 
+- [Setup](docs/setup.md): running every part of the project
 - [Requirements](docs/requirements.md): what we're building and why
 - [OpenBeta data](docs/openbeta.md): how the app uses the API, and known gaps
 - [Capture checklist](docs/capture-checklist.md): photographing a wall
+- [Backend](supabase/README.md): tables, access rules and how to set up a new project
 - [Decisions](docs/adr/): architecture decision records
 - [Work agreement](docs/work-agreement.md): how the team works

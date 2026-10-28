@@ -4,11 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SerifFont, Spacing } from '@/constants/theme';
 import type { Uuid } from '@/core/types';
-import type { Wall } from '@/core/walls';
 import { useTheme } from '@/hooks/use-theme';
 import { AppText } from '@/ui/text';
 import { FactChips, GradeSpread, RoundButton, RouteList } from '@/ui/wall/parts';
-import type { ShownRoute } from '@/ui/wall/types';
+import type { ShownRoute, WallInfo } from '@/ui/wall/types';
 
 const NATIVE_DRIVER = Platform.OS !== 'web';
 
@@ -27,7 +26,7 @@ export function RoutesSheet({
   onSelect,
   onClose,
 }: {
-  wall: Wall;
+  wall: WallInfo;
   place: string | null;
   facts: string[];
   routes: ShownRoute[];

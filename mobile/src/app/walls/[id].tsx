@@ -1,25 +1,38 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 
-import { findWall } from '@/core/walls';
-import { Message } from '@/ui/components';
+import { useLatestModel } from '@/data/models';
+import { useArea } from '@/data/queries';
+import { Loading, Message } from '@/ui/components';
 import { WallView } from '@/ui/wall/wall-view';
 
-/** /walls/<id>?route=<uuid> opens the wall with that route selected. */
+/** /walls/<OpenBeta area uuid>?route=<uuid> opens the wall's newest published model, with that route selected. */
 export default function WallScreen() {
   const { id, route } = useLocalSearchParams<{ id: string; route?: string }>();
-  const wall = findWall(id);
+  const model = useLatestModel(id);
+  const area = useArea(id);
 
-  if (!wall) {
+  if (model.data === undefined || area.data === undefined) {
+    const error = model.error ?? area.error;
+    if (!error) return <Loading />;
     return (
       <>
-        <Stack.Screen options={{ headerShown: true, title: 'Wall not found' }} />
-        <Message title="Wall not found" detail="There's no 3D model for this wall yet." />
+        <Stack.Screen options={{ headerShown: true, title: 'Wall' }} />
+        <Message title="Couldn't open the 3D wall" detail={error.message} />
+      </>
+    );
+  }
+  if (!model.data || !area.data) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: true, title: area.data?.name ?? 'Wall not found' }} />
+        <Message title="No 3D model yet" detail="This wall hasn't been modeled yet." />
       </>
     );
   }
   return (
     <WallView
-      wall={wall}
+      wall={{ uuid: area.data.uuid, name: area.data.name }}
+      model={model.data}
       selected={route || null}
       onSelect={(uuid) => router.setParams({ route: uuid ?? undefined })}
     />

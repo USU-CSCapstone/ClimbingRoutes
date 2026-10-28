@@ -70,9 +70,19 @@ export interface Insets {
   left: number;
 }
 
+/** Where a model file is kept on the device. */
+export interface ModelCacheKey {
+  /** Unique per version, like "<wall uuid>/v1.glb". */
+  key: string;
+  /** Copies in the same group are replaced when a new one is saved, like the wall uuid. */
+  group: string;
+}
+
 export interface ViewerOptions {
   /** URL of the wall's GLB. */
   model: string;
+  /** Keep the file on the device under this key, and load it from there next time. */
+  cache?: ModelCacheKey;
   /** Routes and the whole wall are framed in the area these leave uncovered. */
   insets?: Insets;
   routes?: ViewerRoute[];

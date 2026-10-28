@@ -15,6 +15,7 @@ import { acceleratedRaycast, MeshBVH } from 'three-mesh-bvh';
 import type { Uuid } from '@/core/types';
 import { ROUTE_COLORS } from '@/viewer/colors';
 import { drape, findCapturedFace, typicalEdge } from '@/viewer/geometry';
+import { loadModelBytes } from '@/viewer/model-cache';
 import type {
   DrapeStats,
   Insets,
@@ -175,21 +176,19 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
   resizeObserver.observe(root);
   resize();
 
-  const manager = new THREE.LoadingManager();
+  const download = new AbortController();
   const started = performance.now();
   let bytes: number | null = null;
-  new GLTFLoader(manager).load(
-    options.model,
-    onModel,
-    (e) => {
-      if (!e.total) return;
-      bytes = e.total;
-      options.onProgress?.(e.loaded / e.total);
-    },
-    (err) => {
-      if (!disposed) options.onError?.(err instanceof Error ? err : new Error(String(err)));
-    },
-  );
+  const failed = (err: unknown) => {
+    if (!disposed) options.onError?.(err instanceof Error ? err : new Error(String(err)));
+  };
+  loadModelBytes(options.model, options.cache, (loaded, total) => options.onProgress?.(loaded / total), download.signal)
+    .then((file) => {
+      if (disposed) return;
+      bytes = file.bytes.byteLength;
+      new GLTFLoader().parse(file.bytes, '', onModel, failed);
+    })
+    .catch(failed);
 
   function onModel(gltf: GLTF) {
     const wall = gltf.scene;
@@ -665,7 +664,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     dispose() {
       if (disposed) return;
       disposed = true;
-      manager.abort();
+      download.abort();
       renderer.setAnimationLoop(null);
       resizeObserver.disconnect();
       canvas.removeEventListener('pointerdown', onPointerDown);
