@@ -29,20 +29,18 @@ There are no standalone builds yet either: the project has no EAS setup (`eas.js
 
 ## Configuration
 
-Settings are constants in `src/core/config.ts`. Nothing needs an API key.
+Settings are constants in `src/core/config.ts`. The keys there are public by design: openbeta.io's read-only search key and Supabase's publishable key.
 
 | Constant | What it's for |
 | --- | --- |
 | `OPENBETA_GRAPHQL_URL` | OpenBeta's GraphQL API, for areas, routes and the map |
 | `TYPESENSE_URL`, `TYPESENSE_KEY` | openbeta.io's search server and its read-only key (see Data below) |
 | `ROOT_AREA` | Where Explore and the map start, and what search covers: the USA |
-| `DATA_URL` | Where the app loads wall models and route lines: `data/` on this repo's `main` branch on GitHub |
-| `LOCAL_DATA_URL` | Where `/author`, and the Wall page in a desktop browser on localhost, load `data/` instead: `scripts/viewer/serve.mjs` on port 8765 |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | The team's Supabase project, for accounts, wall models and route lines. Row-level security protects the data, so both can be public. Never put the secret key in the app |
+| `LOCAL_DATA_URL` | Where `/author` reads models and saves route lines: the local `data/` folder, through `scripts/viewer/serve.mjs` on port 8765 |
 
-- **Phones only see `main`.** A model or route line you add shows on a phone once it's merged to `main`, after up to 5 minutes of GitHub caching. In a desktop browser on localhost you see your local `data/` straight away
-- **Forks:** `DATA_URL` points at `USU-CSCapstone/ClimbingRoutes`, so a fork still loads this repo's models. Point it at your fork to test new models on a phone
 - **Port:** `serve.mjs` takes a port (`node scripts/viewer/serve.mjs 9000`), but the app always looks on 8765, so change `LOCAL_DATA_URL` to match
-- **Walls with a model** are listed in `src/core/walls.ts`. See [Adding a wall](../data/README.md#adding-a-wall)
+- **Walls with a model** are the walls with a published model in Supabase. To publish one, see [docs/setup.md](../docs/setup.md#draw-route-lines)
 
 ## Drawing routes
 
@@ -52,7 +50,7 @@ The author tool at `/author` draws route lines on a wall's model and saves them 
 node scripts/viewer/serve.mjs
 ```
 
-Then open http://localhost:8081/author. `?model=crag16.glb` picks a model from `data/models/index.json`. Pick a route, click **Draw**, and click holds from the start upward. **Save routes** writes `data/routes/<model>.json`; commit that file to share the lines. To show a new model on a Wall page, see [Adding a wall](../data/README.md#adding-a-wall).
+Then open http://localhost:8081/author. `?model=crag16.glb` picks a model from `data/models/index.json`. Pick a route, click **Draw**, and click holds from the start upward. **Save routes** writes `data/routes/<model>.json`; commit that file to share the lines. To publish a wall with its lines, see [docs/setup.md](../docs/setup.md#draw-route-lines).
 
 ## Layout
 

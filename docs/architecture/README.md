@@ -9,13 +9,13 @@ flowchart LR
   OB["OpenBeta GraphQL<br/>api.openbeta.io"]
   TS["openbeta.io search<br/>(Typesense)"]
   OFM["OpenFreeMap<br/>map tiles"]
-  GH["GitHub, main branch<br/>data/: wall models + route lines"]
+  SB["Supabase<br/>accounts, wall models, route lines"]
   App["Expo app<br/>iOS · Android · web"]
 
   OB -->|"areas, routes, map areas"| App
   TS -->|"search"| App
   OFM -->|"map tiles"| App
-  GH -->|"wall models, route lines"| App
+  SB -->|"published models, route lines, sign-in"| App
 
   subgraph Team["Team, in development"]
     PC["Team PC<br/>RealityScan + scripts/realityscan"]
@@ -29,14 +29,14 @@ flowchart LR
     Serve -->|"writes data/routes/"| Local
   end
 
-  Local -->|"pull request, merge"| GH
+  Local -->|"npm run seed, as the moderator"| SB
 ```
 
 - **Route and area data** comes live from OpenBeta, looked up by uuid. Search uses openbeta.io's own search server and falls back to GraphQL area search ([ADR 0003](../adr/0003-openbeta-data.md), [openbeta.md](../openbeta.md))
-- **Wall models and route lines** are files in [`data/`](../../data/README.md), loaded from `main` on GitHub. In development, in a desktop browser on localhost, the app reads the local `data/` through `serve.mjs` instead
+- **Wall models and route lines** are published to the team's Supabase project, and the app loads them from there ([ADR 0006](../adr/0006-supabase-backend.md)). The working files are in [`data/`](../../data/README.md), which `/author` reads and saves through `serve.mjs`
 - **Models** are made on the team PC: photos go through RealityScan and `scripts/realityscan/run.reproject.ps1` to one GLB per wall ([ADR 0001](../adr/0001-photogrammetry.md), [ADR 0005](../adr/0005-wall-model-format.md))
 - **Route lines** are drawn on a model in `/author` and saved as `data/routes/<model>.json`. The author tool takes its route list from a saved OpenBeta response, `data/openbeta/date-wall.json`, so for now it only lists Date Wall's routes
-- There's no backend of our own yet
+- **The backend** is Supabase: team accounts with a moderator, the wall model list, route lines and model files, with access rules in the database ([supabase/README.md](../../supabase/README.md))
 
 ## App code
 
@@ -47,7 +47,7 @@ flowchart TD
   app["src/app<br/>screens and navigation (Expo Router)"]
   author["src/author<br/>route author tool, /author (development only)"]
   ui["src/ui<br/>shared components, Wall page parts, map"]
-  data["src/data<br/>React Query hooks and caching"]
+  data["src/data<br/>React Query hooks, caching, Supabase client and sign-in"]
   viewer["src/viewer<br/>three.js wall viewer"]
   core["src/core<br/>types, OpenBeta client, search, grades, walls"]
 
@@ -80,8 +80,8 @@ The planned pipeline once climbers can scan walls themselves. Not all of it exis
 | Step | Status |
 | --- | --- |
 | OpenBeta and map tiles into the app | Built. The tiles come from OpenFreeMap, on OpenStreetMap data |
-| 1 · Scan in the app, upload on Wi-Fi to Supabase | Milestone 2, in progress. Supabase is being recorded as ADR 0006 (#43) |
+| 1 · Scan in the app, upload on Wi-Fi to Supabase | Milestone 2, in progress. The Supabase project is set up ([ADR 0006](../adr/0006-supabase-backend.md)) |
 | 2 · Team PC pulls the scan | Milestone 2 (#46) |
-| 3 · Team PC makes the wall model | Built, run by hand ([README](../../README.md#making-a-wall-model)) |
-| 4 · Author tool draws route lines and publishes them | Built. "Publish" is a pull request to `main` today |
-| 5 · Server sends 3D walls to the app | Today that server is GitHub. A real one needs a new decision record |
+| 3 · Team PC makes the wall model | Built, run by hand ([setup](../setup.md#make-a-wall-model)) |
+| 4 · Author tool draws route lines and publishes them | Drawing is built. A wall's first version is published with `npm run seed`; the moderator's review queue in the app is a placeholder so far |
+| 5 · Server sends 3D walls to the app | Built: Supabase serves published models and their route lines |

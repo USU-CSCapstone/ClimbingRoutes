@@ -84,7 +84,7 @@ To publish a wall that has no model yet, with its lines, as v1: from `supabase/`
 
 ## Make a wall model
 
-On the team PC: Windows, RealityScan 2.2, an NVIDIA GPU and Node.
+On the team PC: Windows, an NVIDIA GPU, Node, and RealityScan 2.2 installed through the Epic Games Launcher (the script looks for `RealityScan.exe` under `C:\Program Files\Epic Games`).
 
 1. Photograph the wall with the [capture checklist](capture-checklist.md)
 2. Copy the photos to a folder on the team PC
@@ -94,7 +94,9 @@ On the team PC: Windows, RealityScan 2.2, an NVIDIA GPU and Node.
    .\run.reproject.ps1 -Name <wall> -Imgs <photo folder>
    ```
 
-   It prints how many photos aligned and the model's size against the 15 MB budget. The model is `C:\Users\Garage\rs\<wall>\out\<wall>.glb`
+   After RealityScan it fixes up the export (`glb-finish.mjs`), swaps the texture for a JPEG (`glb-texture.mjs`, `-Quality 85` by default) and levels the model from the camera poses (`level.mjs`). It prints how many photos aligned and the model's size against the 15 MB budget. Alignment ignores the photos' GPS, because phone GPS is metres off and fitting to it tilted crag models by 35–55 degrees (`-UseGps` turns it back on)
+
+   Runs go in `-Root`, which defaults to the team PC's `C:\Users\Garage\rs`, so the model is `<Root>\<wall>\out\<wall>.glb`
 
 RealityScan does nothing when started from an SSH session. Run the script on the PC's desktop, or from a scheduled task created with `/it`.
 

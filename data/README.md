@@ -1,6 +1,6 @@
 # Data
 
-The files the app loads from this repo rather than from OpenBeta: wall models and the route lines drawn on them. The app reads this folder from `main` on GitHub, so a file here goes live once it's merged.
+Working copies of wall models and the route lines drawn on them. The route drawing tool (`/author`) reads and saves these files, and walls are published from them to the team's Supabase project, where the app loads them from ([ADR 0006](../docs/adr/0006-supabase-backend.md)).
 
 | Path | What's there |
 | --- | --- |
@@ -11,11 +11,11 @@ The files the app loads from this repo rather than from OpenBeta: wall models an
 
 ## Demo data
 
-Date Wall in Logan Canyon, Utah, is the only wall with a model so far. It was the proof of concept's test wall. To open it in the app, see [Try the demo](../README.md#try-the-demo).
+Date Wall in Logan Canyon, Utah, is the only wall with a model so far. It was the proof of concept's test wall. To open it in the app, see [Things to try](../docs/setup.md#things-to-try).
 
 | Model | Made from | Routes drawn | Used by |
 | --- | --- | --- | --- |
-| `wall47.glb` | Date Wall, 47 photos. 36 MB, 1M triangles, two 8K JPEG textures | Smitten, Hooked, NCMO | The Date Wall page |
+| `wall47.glb` | Date Wall, 47 photos. 36 MB, 1M triangles, two 8K JPEG textures | Smitten, Hooked, NCMO | Published as Date Wall's v1, which the Date Wall page shows |
 | `crag16.glb` | Date Wall, 16 photos. 40 MB, 300k triangles, one 8K PNG texture | Hooked, NCMO | Only `/author`, for comparison |
 | `wallpics01.glb` | Not recorded. 14 MB, 300k triangles, one JPEG texture | None | Only `/author` |
 
@@ -63,23 +63,11 @@ Written by the author tool and checked by `scripts/viewer/serve.mjs` when it sav
 ## Adding a wall
 
 1. **Photograph it** with the [capture checklist](../docs/capture-checklist.md)
-2. **Make the model** with `scripts/realityscan/run.reproject.ps1` ([Making a wall model](../README.md#making-a-wall-model)) and copy the finished `.glb` into `models/`. Keep it to 15 MB or less
+2. **Make the model** with `scripts/realityscan/run.reproject.ps1` ([Make a wall model](../docs/setup.md#make-a-wall-model)) and copy the finished `.glb` into `models/`. Keep it to 15 MB or less
 3. **List it** in `models/index.json`
 4. **Draw the routes.** Start the author tool ([Drawing routes](../mobile/README.md#drawing-routes)), open `http://localhost:8081/author?model=<file>.glb`, draw each route and click **Save routes**. That writes `routes/<file>.json`. The author tool's route list comes from `openbeta/date-wall.json`, so today it only lists Date Wall's routes. A new wall needs the tool to load that wall's routes first, which isn't built yet
-5. **Add the wall to the app** with an entry in `WALLS` in [`mobile/src/core/walls.ts`](../mobile/src/core/walls.ts). That one entry is all the app needs:
-
-   ```ts
-   {
-     id: 'date-wall', // the page URL, /walls/date-wall
-     name: 'Date Wall',
-     areaUuid: '8c45d40d-363d-5a9b-9659-3df50c5d3916', // the wall's OpenBeta area
-     model: 'wall47.glb', // file in data/models/
-     routes: 'wall47.json', // file in data/routes/
-   },
-   ```
-
-   `areaUuid` is the last part of the wall's area page URL, in the app (`/area/<uuid>`) or on openbeta.io. The entry adds "View the wall in 3D" to the area page and "See it on the 3D wall" to its route pages, and marks the wall 3D on the map
-6. **Check it** at `http://localhost:8081/walls/<id>` with `serve.mjs` running, then open a pull request. Phones show the wall once it's merged to `main`
+5. **Publish it** as the wall's first version: from `supabase/`, run `npm run seed -- ../data/routes/<file>.json`. It signs in as the moderator account ([Backend setup](../docs/setup.md#backend)), uploads the model and adds its route lines. The routes file's `area.openbeta_uuid` says which wall it is, and a wall that already has a version is left alone. Once published, the wall's area page offers "View in 3D" and the map marks it 3D
+6. **Check it** at `http://localhost:8081/walls/<area uuid>`, then open a pull request with the files in `data/` so the drawing tool has them
 
 ## Fixing route details
 

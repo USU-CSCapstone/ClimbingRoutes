@@ -15,4 +15,4 @@ Walk along the wall and take one photo every step, starting and ending a step pa
 
 - 16 overlapping photos were enough for a usable model (`crag16.glb`). The best model so far, `wall47.glb`, used 47
 - Keep photo sets outside the repo. They're too big for git, and `.gitignore` skips HEIC files
-- The photos go through `scripts/realityscan/run.reproject.ps1` on the team PC. See "Making a wall model" in the [README](../README.md#making-a-wall-model)
+- The photos go through `scripts/realityscan/run.reproject.ps1` on the team PC. See "Make a wall model" in [setup](setup.md#make-a-wall-model)

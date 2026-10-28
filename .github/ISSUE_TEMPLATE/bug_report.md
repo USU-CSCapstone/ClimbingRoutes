@@ -17,7 +17,7 @@ labels: bug
 ## Where
 
 - **Platform:** <!-- web (which browser), iPhone in Expo Go, Android in Expo Go, or a script -->
-- **Page or wall:** <!-- e.g. /walls/date-wall, or the route or area name -->
+- **Page or wall:** <!-- e.g. the Date Wall 3D page (/walls/<area uuid>), or the route or area name -->
 - **Branch or commit:** <!-- if you ran it from source -->
 
 ## Screenshots or logs
