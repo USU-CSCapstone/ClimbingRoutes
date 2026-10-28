@@ -1,6 +1,6 @@
 # Climbing Routes app
 
-Expo app (iOS, Android, web) for browsing and searching OpenBeta climbing data. Covers the USA.
+Expo app (iOS, Android, web) for browsing and searching OpenBeta climbing data, with 3D wall models. Covers the USA. Setup for the whole project is in [docs/setup.md](../docs/setup.md).
 
 ## Run
 
@@ -34,7 +34,7 @@ Then open http://localhost:8081/author. `?model=crag16.glb` picks a model from `
 
 ## Layout
 
-- `src/app/` screens and navigation (Expo Router). Explore, Map and Search share the area and route pages through the `(explore,map,search)` group
+- `src/app/` screens and navigation (Expo Router). Explore, Map and Search share the area and route pages through the `(explore,map,search)` group. `walls/` is the 3D wall page, and `moderate/` the moderator section
 - `src/core/` types, OpenBeta client, search, grades. No React imports, so Node scripts can reuse it (enforced by lint)
 - `src/data/` React Query hooks and caching, and the Supabase client (`supabase.ts`) and sign-in (`auth.ts`)
 - `src/ui/` shared components

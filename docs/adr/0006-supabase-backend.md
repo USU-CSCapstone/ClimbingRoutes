@@ -11,7 +11,6 @@ Limits:
 
 - Free hosting only
 - The team PC can't accept incoming connections. It's reached over Tailscale and SSH only
-- Models are about 12 MB at the 300k-triangle default, and at most 50 MB
 - Route lines only fit the exact model version they were drawn on
 
 ## Decision
@@ -24,6 +23,7 @@ Use one Supabase project on the free plan for auth, Postgres and storage.
 - Access is enforced with row-level security, and checked by `supabase/tests/rls-check.mjs`
 - The app uses only the publishable key and the user's session. The secret key stays on the team PC
 - Versions never change. Reprocessing a wall adds `<wall>/v<N+1>.glb`
+- The app loads published models from the `models` bucket instead of `data/models/` in git. [0005](0005-wall-model-format.md) still sets the file format
 - The worker on the team PC polls Supabase, so the PC needs no incoming connections
 
 ## Consequences

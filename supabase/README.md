@@ -30,6 +30,8 @@ Paths: photos at `captures/<user id>/<capture id>/<file>`, models at `review/` o
 
 ## Setting up the project
 
+The team's project already exists. These steps are for making a new one; to work with the existing one, see [docs/setup.md](../docs/setup.md#backend).
+
 1. Create a project at [database.new](https://database.new) on the free plan, in an Americas region
 2. **Authentication → Sign In / Providers → Email:** turn off **Allow new users to sign up** and **Confirm email**
 3. **Authentication → Users → Add user → Create new user** for each account, with **Auto Confirm User** checked:

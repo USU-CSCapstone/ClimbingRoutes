@@ -36,15 +36,17 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 - Tapping a route in the list moves the camera to it. Tapping a line selects that route
 - The camera stays within a front arc of the wall, because the model has no back side
 - Models download with their area for offline use
-- **Made by the team for now.** We photograph a wall, process it on the team PC with RealityScan ([ADR 0001](adr/0001-photogrammetry.md)), and draw the routes in our desktop tool (`viewer/`). Capture steps are in the [capture checklist](capture-checklist.md)
+- **Made by the team for now.** We photograph a wall, process it on the team PC with RealityScan ([ADR 0001](adr/0001-photogrammetry.md)), draw its routes, and publish it to the backend ([ADR 0006](adr/0006-supabase-backend.md)). Capture steps are in the [capture checklist](capture-checklist.md)
+- **Captured in the app.** Photos taken in the app upload for the team PC to process. The moderator account reviews each model, draws its routes and publishes or rejects it. A wall's page offers "View in 3D" once it has a published model
 
 ## Technical approach
 
 - **App:** Expo with Expo Router and TypeScript, in `mobile/`. Data loading and caching use React Query. Screens get data through `src/data/` and never call the network directly, so offline storage can be added later without changing them
 - **Route data:** the OpenBeta GraphQL API. It's free, needs no key, and the data is CC0. See [openbeta.md](openbeta.md)
 - **Search:** openbeta.io's own search server. If it fails, the app falls back to GraphQL area search, which can't find routes
-- **3D:** Three.js through React Three Fiber, on web and native
-- **Model pipeline:** `scripts/realityscan/run.reproject.ps1` then `glb-finish.mjs`, which produce a single GLB per wall
+- **3D:** plain three.js in an Expo DOM component, the same code on web and in a webview on phones ([ADR 0004](adr/0004-wall-viewer.md))
+- **Model pipeline:** `scripts/realityscan/run.reproject.ps1`, which produces a single GLB per wall ([ADR 0005](adr/0005-wall-model-format.md))
+- **Backend:** Supabase for accounts, the model list, route lines and model files, with access enforced in the database ([ADR 0006](adr/0006-supabase-backend.md))
 - **Team setup:** one developer on a Mac and one on Windows, both with iPhones. Everything has to work from Windows, in the browser and in Expo Go
 
 ## What the proof of concept showed
@@ -65,11 +67,8 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 ## Open questions
 
 - **Search access.** The openbeta.io search server isn't a documented API, and its read-only key comes from their website code. Should we ask OpenBeta for access, or build our own index from their data export?
-- **Backend.** Phase 1 doesn't need one. Do we need one to host models?
-- **Model hosting.** Models are 10–200 MB and don't belong in plain git. Git LFS, or file storage with a list of models?
 - **Model size.** 300k, 1M or 8M triangles? Should we offer a lighter version on slow connections?
-- **Route-line format.** Save the surface-following points so phones don't recompute them, and name the exact model each file belongs to
-- **3D on phones.** Is React Three Fiber smooth enough in the native app? Test with one model and one route before building the viewer screen
+- **3D on phones.** Is the webview viewer smooth enough on older phones, with 8K textures?
 
 ## Success criteria
 
@@ -81,7 +80,6 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 
 ## Later
 
-- Guided photo capture and upload by users
 - Boulders, with full walk-around models
 - AR: preview a wall model on a table, or overlay routes on the real wall
 - Measurements from the model, such as route height and overhang angle
