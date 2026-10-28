@@ -1,7 +1,7 @@
 // Level a finished GLB using the photo cameras: gravity goes on -Y and the wall
 // faces +Z. glb-finish.mjs assumes RealityScan's +Z is up, which can be tens of
-// degrees off. Handheld photos have little roll, so every camera's right axis is
-// level, and up is the direction most perpendicular to all of them. The mean
+// degrees off. Handheld photos have little roll, so every camera's horizontal image
+// axis is level, and up is the direction most perpendicular to all of them. The mean
 // image-up vector is only a fallback: it leans back by however far the cameras
 // look up, about 25 degrees at the foot of a crag.
 //
@@ -83,21 +83,30 @@ const vertices = json.meshes
     return out;
   });
 
-const downSum = cams.reduce((s, c) => add(s, c.down), [0, 0, 0]);
-const scatter = [0, 1, 2].map((i) => [0, 1, 2].map((j) => cams.reduce((s, c) => s + c.right[i] * c.right[j], 0)));
-const [least, middle, most] = eigen(scatter);
-// With too little spread in where the cameras point, their right axes only pin down the side-to-side tilt.
-const fromRightAxes = middle.value / cams.length > 0.05;
-let up = fromRightAxes
-  ? least.vector
-  : unit(sub(downSum, scale(most.vector, dot(downSum, most.vector))));
-if (dot(up, downSum) > 0) up = scale(up, -1);
-const roll = median(cams.map((c) => Math.abs(deg(Math.asin(dot(c.right, up))))));
+// RealityScan ignores JPEG EXIF rotation, so a portrait photo's right axis is its vertical, and EXIF
+// orientation 3 or 8 points it up. The image axis nearer to up is the vertical one, and its sign says
+// which way is down. RealityScan's +Z is the first guess at up (within 2 degrees with GPS off, 35-55
+// with GPS), and each leveling gives a better guess.
+function levelAgainst(guess) {
+  const axes = cams.map((c) => {
+    const portrait = Math.abs(dot(c.right, guess)) > Math.abs(dot(c.down, guess));
+    const vertical = portrait ? c.right : c.down;
+    const turned = dot(vertical, guess) > 0;
+    return { side: portrait ? c.down : c.right, down: turned ? scale(vertical, -1) : vertical, portrait, turned };
+  });
+  const downSum = axes.reduce((s, a) => add(s, a.down), [0, 0, 0]);
+  const scatter = [0, 1, 2].map((i) => [0, 1, 2].map((j) => axes.reduce((s, a) => s + a.side[i] * a.side[j], 0)));
+  const [least, middle, most] = eigen(scatter);
+  // With too little spread in where the cameras point, their level axes only pin down the side-to-side tilt.
+  const fromSideAxes = middle.value / cams.length > 0.05;
+  const up = fromSideAxes ? least.vector : unit(sub(downSum, scale(most.vector, dot(downSum, most.vector))));
+  return { axes, fromSideAxes, spread: middle.value / cams.length, up: dot(up, downSum) > 0 ? scale(up, -1) : up };
+}
+let fit = levelAgainst([0, 0, 1]);
+for (let i = 0; i < 5; i++) fit = levelAgainst(fit.up);
+const { axes, fromSideAxes, spread, up } = fit;
+const roll = median(axes.map((a) => Math.abs(deg(Math.asin(dot(a.side, up))))));
 if (roll > 15) throw new Error(`cameras are rolled ${roll.toFixed(0)} deg from level on average; not leveling`);
-// Photos are taken from the ground, so most of the wall should be above the cameras. If it isn't,
-// the photos were rotated 180 degrees (EXIF orientation 3), which RealityScan ignores.
-const flipped = median(vertices.map((v) => dot(v, up))) < median(cams.map((c) => dot(c.pos, up)));
-if (flipped) up = scale(up, -1);
 const fwdSum = cams.reduce((s, c) => add(s, c.forward), [0, 0, 0]);
 const level = unit(sub(fwdSum, scale(up, dot(fwdSum, up))));
 const facing = scale(level, -1);
@@ -140,10 +149,11 @@ for (const scene of json.scenes) {
 }
 const size = writeGlb(dst, json, view);
 
+const portraits = axes.filter((a) => a.portrait).length;
 console.log(`${cams.length} cameras, median roll ${roll.toFixed(1)} deg`);
-if (fromRightAxes) console.log(`up from the camera right axes (spread ${(middle.value / cams.length).toFixed(2)})`);
+console.log(`${cams.length - portraits} landscape, ${portraits} portrait, ${axes.filter((a) => a.turned).length} of them turned 180 deg`);
+if (fromSideAxes) console.log(`up from the cameras' level image axes (spread ${spread.toFixed(2)})`);
 else console.log("the cameras all point one way, so up is from their image-up vectors: the forward/back tilt is off by their mean pitch");
-if (flipped) console.log("most of the model was below the cameras, so up was flipped (photos rotated 180 degrees)");
 console.log(`tilt vs RealityScan +Z: ${deg(Math.acos(Math.min(1, up[2]))).toFixed(1)} deg`);
 console.log(`camera heights span ${(Math.max(...heights) - Math.min(...heights)).toFixed(2)}, median pitch ${pitch.toFixed(1)} deg`);
 console.log(`wall center is ${dot(sub(center, camCenter), level).toFixed(2)} in front of the cameras, ${dot(sub(center, camCenter), up).toFixed(2)} above them`);
