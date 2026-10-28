@@ -33,7 +33,7 @@ flowchart LR
 ```
 
 - **Route and area data** comes live from OpenBeta, looked up by uuid. Search uses openbeta.io's own search server and falls back to GraphQL area search ([ADR 0003](../adr/0003-openbeta-data.md), [openbeta.md](../openbeta.md))
-- **Wall models and route lines** are files in [`data/`](../../data/README.md), loaded from `main` on GitHub. In development, in a desktop browser on localhost, the app reads the local `data/` through `serve.mjs` instead ([ADR 0007](../adr/0007-model-hosting.md))
+- **Wall models and route lines** are files in [`data/`](../../data/README.md), loaded from `main` on GitHub. In development, in a desktop browser on localhost, the app reads the local `data/` through `serve.mjs` instead
 - **Models** are made on the team PC: photos go through RealityScan and `scripts/realityscan/run.reproject.ps1` to one GLB per wall ([ADR 0001](../adr/0001-photogrammetry.md), [ADR 0005](../adr/0005-wall-model-format.md))
 - **Route lines** are drawn on a model in `/author` and saved as `data/routes/<model>.json`. The author tool takes its route list from a saved OpenBeta response, `data/openbeta/date-wall.json`, so for now it only lists Date Wall's routes
 - There's no backend of our own yet
@@ -84,4 +84,4 @@ The planned pipeline once climbers can scan walls themselves. Not all of it exis
 | 2 · Team PC pulls the scan | Milestone 2 (#46) |
 | 3 · Team PC makes the wall model | Built, run by hand ([README](../../README.md#making-a-wall-model)) |
 | 4 · Author tool draws route lines and publishes them | Built. "Publish" is a pull request to `main` today |
-| 5 · Server sends 3D walls to the app | Today that server is GitHub ([ADR 0007](../adr/0007-model-hosting.md)). A real one needs a new decision record |
+| 5 · Server sends 3D walls to the app | Today that server is GitHub. A real one needs a new decision record |

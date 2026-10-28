@@ -1,6 +1,6 @@
 # Data
 
-The files the app loads from this repo rather than from OpenBeta: wall models and the route lines drawn on them. The app reads this folder from `main` on GitHub ([ADR 0007](../docs/adr/0007-model-hosting.md)), so a file here goes live once it's merged.
+The files the app loads from this repo rather than from OpenBeta: wall models and the route lines drawn on them. The app reads this folder from `main` on GitHub, so a file here goes live once it's merged.
 
 | Path | What's there |
 | --- | --- |

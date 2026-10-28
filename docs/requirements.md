@@ -57,7 +57,7 @@ Climbers scan a wall themselves in the app, and the photos go to the team to be 
 - **Search:** openbeta.io's own search server. If it fails, the app falls back to GraphQL area search, which can't find routes
 - **3D:** plain three.js in an Expo DOM component, the same code on web and native ([ADR 0004](adr/0004-wall-viewer.md))
 - **Model pipeline:** `scripts/realityscan/run.reproject.ps1` runs RealityScan, then `glb-finish.mjs`, `glb-texture.mjs` and `level.mjs`, to produce a single GLB per wall ([ADR 0005](adr/0005-wall-model-format.md))
-- **Wall data:** models and route lines are files in `data/`, and the app loads them from GitHub ([ADR 0007](adr/0007-model-hosting.md))
+- **Wall data:** models and route lines are files in `data/`, and the app loads them from GitHub
 - **Uploads:** Supabase storage and a captures table, from Milestone 2 (ADR 0006, #43)
 
 How the pieces connect is in [architecture](architecture/README.md).
@@ -82,7 +82,7 @@ How the pieces connect is in [architecture](architecture/README.md).
 
 - **Search access.** The openbeta.io search server isn't a documented API, and its read-only key comes from their website code. Should we ask OpenBeta for access, or build our own index from their data export?
 - **Backend.** Milestone 2 adds Supabase for photo uploads (#43). Should the same project host models, accounts and moderation later?
-- **Model hosting.** For now models stay in git and the app loads them from GitHub ([ADR 0007](adr/0007-model-hosting.md)). That won't scale to climbers' uploads, so where do models live once there are many?
+- **Model hosting.** For now models stay in git and the app loads them from GitHub. That won't scale to climbers' uploads, so where do models live once there are many?
 - **Model size.** 300k, 1M or 8M triangles? Should we offer a lighter version on slow connections?
 - **Route-line format.** Save the surface-following points so phones don't recompute them, and name the exact model each file belongs to
 - **3D on phones.** The viewer runs in a webview on phones ([ADR 0004](adr/0004-wall-viewer.md)). Is it smooth enough with 8K textures on older phones?
