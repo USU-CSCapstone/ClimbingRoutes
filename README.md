@@ -33,6 +33,7 @@ The full list is in [docs/requirements.md](docs/requirements.md).
 | `data/routes/` | Route lines drawn in the viewer, one file per model |
 | `data/openbeta/` | Saved OpenBeta responses for the test wall |
 | `scripts/` | OpenBeta fetch, RealityScan pipeline, and the viewer's local server |
+| `supabase/` | Backend: database migrations with access rules, the seed script and access checks. Setup in [supabase/README.md](supabase/README.md) |
 | `docs/` | Requirements, decisions and project notes |
 
 ## Getting started

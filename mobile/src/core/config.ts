@@ -9,6 +9,13 @@ export const TYPESENSE_KEY = 'bCGIB4sHsJRy06NFjZLtxKIMgr4aO0tX';
 /** v1 covers the USA. Explore and the map start here and search is limited to it. */
 export const ROOT_AREA = { uuid: '1db1e8ba-a40e-587c-88a4-64f5ea814b8e', name: 'USA' };
 
+// The team's Supabase project: accounts, wall models and route lines. Both values are
+// public by design (row-level security in supabase/migrations/ protects the data), so
+// they live here rather than in a .env. Never put the secret (service) key in the app.
+// If they're ever emptied, the Profile tab says accounts aren't set up.
+export const SUPABASE_URL = 'https://ccflxypdobybekmsvbvn.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_9tORocZZsmU6UyOOOmrXYQ_BU5F_NT4';
+
 /** The repo's data/ folder (wall models and route lines) on main, as GitHub serves it. */
 export const DATA_URL = 'https://raw.githubusercontent.com/USU-CSCapstone/ClimbingRoutes/main/data';
 
