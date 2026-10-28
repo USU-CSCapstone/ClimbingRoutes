@@ -4,7 +4,7 @@ Issue #48. Shoot the same rock twice, once with Expo's camera (JPEG) and once wi
 
 ## The test screen
 
-In development, Explore shows a **Camera test** row at the top. It opens a throwaway screen (`mobile/src/app/camera-test.tsx`) that takes photos with `expo-camera` and saves each one to a **ClimbingRoutes camera test** album in the phone's photo library. It uses the back 1x lens, flash and zoom off, continuous autofocus and JPEG quality 1, and shows each photo's size and lens EXIF.
+The test used a throwaway screen, `mobile/src/app/camera-test.tsx`, reached from a development-only **Camera test** row on Explore. It took photos with `expo-camera` and saved each one to a **ClimbingRoutes camera test** album in the phone's photo library (through `expo-media-library`). It used the back 1x lens, flash and zoom off, continuous autofocus and JPEG quality 1, and showed each photo's size and lens EXIF. The screen and `expo-media-library` were removed once #48 was answered; the code is in git history.
 
 What reading `expo-camera`'s code showed (SDK 57 and 58 behave the same), which #51 needs too:
 
@@ -32,7 +32,7 @@ On the iPhone:
 ## Processing
 
 1. Copy each set into its own folder on the team PC, for example `camtest\inapp` and `camtest\native`, by cable or Google Drive
-2. Check what each set carries: `node scripts/realityscan/exif.mjs <inapp folder> <native folder>`
+2. Check what each set carries with `scripts/realityscan/exif.mjs`, which printed each set's camera, lens, focal length, pixel size and GPS. It was removed after the test, and is in git history
 3. Move `C:\Users\Garage\rs\wall.rsbox` aside if it exists. It comes from another alignment and won't line up with these
 4. Run each set with the version of `run.reproject.ps1` that ignores the photos' GPS. The HEICs have GPS and the JPEGs don't, so with GPS on, only the HEIC model gets fitted to it:
    - `run.reproject.ps1 -Name camtest-inapp -Imgs <inapp folder>`

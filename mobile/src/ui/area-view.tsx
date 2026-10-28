@@ -2,7 +2,6 @@ import { Stack } from 'expo-router';
 import { FlatList, StyleSheet, View } from 'react-native';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { ROOT_AREA } from '@/core/config';
 import type { Area, AreaSummary, ClimbSummary, Uuid } from '@/core/types';
 import { useHasModel } from '@/data/models';
 import { useArea } from '@/data/queries';
@@ -87,10 +86,6 @@ function AreaHeader({ area }: { area: Area }) {
         <View style={styles.wallLink}>
           <WallLink wallUuid={area.uuid} label="View in 3D" />
         </View>
-      ) : null}
-      {/* Throwaway: the camera test for issue #48. Remove with app/camera-test.tsx. */}
-      {__DEV__ && area.uuid === ROOT_AREA.uuid ? (
-        <LinkRow href="/camera-test" title="Camera test" subtitle="Development only, for issue #48" />
       ) : null}
       {area.climbs.length > 0 ? (
         <AppText type="label" color="textSecondary" style={styles.listLabel}>
