@@ -42,18 +42,36 @@ On the iPhone:
 
 ## Results
 
+Both sets were shot on the same iPhone 16 main camera (26 mm equivalent), a few minutes apart, of a sculpture about 2 m tall in a plaza rather than rock. Both went through `run.reproject.ps1` with its defaults.
+
 | | In-app (Expo, JPEG) | Phone camera (HEIC) |
 | --- | --- | --- |
-| Phone | iPhone 16 | iPhone 16 |
-| Photos | | |
-| Pixels | 3024 × 4032 (12 MP) | 4284 × 5712 (24 MP) |
-| Focal length, 35 mm equivalent (EXIF) | 26 mm | 26 mm |
-| Focal length RealityScan solved | | |
-| GPS | | |
-| Average file size | | |
-| Photos aligned | | |
-| Model: holes, holds, tilt | | |
-| Time to shoot | | |
+| Photos | 14 JPEG | 15 HEIC |
+| Pixels | 4032 × 3024 (12 MP) | 5712 × 4284 (24 MP) |
+| GPS | None | Yes, ignored by the script |
+| Photos aligned | 14 of 14 | 15 of 15 |
+| RealityScan time | 1:46 | 2:12 |
+| Model | 300k triangles, one 8K JPEG texture, 13.2 MB | 300k triangles, one 8K JPEG texture, 13.3 MB |
+| How it looks | Good | Good, a little sharper |
+
+Not recorded: how long each pass took to shoot, and the focal length RealityScan solved.
+
+The models are `inAppTest01.glb` and `nativeTest01.glb`, in `data/models` on the team PC. They aren't committed or listed in `index.json`, so open them by name: `/author?model=inAppTest01.glb`.
+
+### What skews the comparison
+
+- **Region box.** RealityScan's automatic box took in much more of the plaza and trees for the in-app set. They use up some of the 300k triangles and the 8K texture, so the sculpture gets less of both, and some of the in-app model's softness may come from that rather than the camera
+- **Resolution.** 12 MP against 24 MP is the main difference between the cameras, and the likely source of whatever sharpness gap is left
+- **Subject.** A sculpture, not rock, and 14 photos against 15
+
+### Leveling: portrait JPEGs
+
+On the first pass the in-app model came out lying on its side and the native one upside down. Both problems were in `level.mjs`:
+
+- **Portrait JPEGs.** RealityScan ignores a JPEG's EXIF rotation, so `level.mjs` took the cameras' vertical axis for a horizontal one. The in-app camera saves portrait JPEGs, so every in-app capture would hit this. The HEICs came through upright
+- **Flip.** `level.mjs` turned a model over when most of it was below the cameras. That suits a crag, not a 2 m sculpture with ground around it
+
+`level.mjs` now takes each photo's vertical axis from RealityScan's up direction, refining the guess a few times. Both test models stand upright with it. Re-run on `wallpics01`, `wallpics01b`, `wallpics02` and `crag16b`, all four come out exactly as before (0.00° difference), so existing models and their routes aren't affected. The fix is still uncommitted on the team PC, and `inAppTest01.log` and `nativeTest01.log` there still show the old leveling.
 
 ### First photos: the in-app ones look dimmer
 
@@ -72,4 +90,10 @@ What could close it:
 - **In Expo Go:** nothing in `expo-camera` controls exposure, HDR or processing. Shooting with the camera app and importing from the library (#52) keeps the 24 MP HDR originals, if the import doesn't convert them, but loses the guided overlays
 - **Outside Expo Go,** in a development build, which needs a new ADR: patch `expo-camera` or write a small native module that asks for best quality, raises the photo size to 24 or 48 MP and saves Apple's HEIC as it is, or use `react-native-vision-camera`, which has settings for all three
 
-**Conclusion:**
+## Conclusion
+
+Expo's camera is good enough for the guided camera (#51), so Milestone 2 can stay in Expo Go. Both sets aligned every photo and made a usable model under the 15 MB budget. The phone camera's model is only a little sharper, and the region box may account for part of that. The in-app set also processed faster (1:46 against 2:12), with half the pixels per photo and one photo fewer.
+
+Before in-app scans go through the pipeline, the `level.mjs` fix has to be committed, or every portrait JPEG scan comes out on its side.
+
+For a closer comparison, shoot rock rather than a sculpture, use the same number of photos, and give both runs the same region box so neither model spends its triangles on the background.
