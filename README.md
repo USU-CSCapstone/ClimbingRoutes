@@ -20,18 +20,18 @@ USU Computer Science capstone project.
 - Browse the USA from state to area to wall
 - Map of the USA that groups walls into their areas when zoomed out, with walls that have a 3D model marked
 - Route pages with grade, type, length, bolts, description and first ascent when OpenBeta has them
-- A 3D Wall page: the wall's model with each route drawn on the rock, numbered to match the route list. Tap a route in the list or its line to select it. Date Wall is the only wall with a model so far
-- An author tool for drawing route lines on a model (development only)
+- A 3D Wall page: the wall's model with each route drawn on the rock, numbered to match the route list. Tap a route in the list or its line to select it. Date Wall in Logan Canyon is the first
+- Team accounts, with a moderator account that will review new models
+- A route drawing tool for the team (`/author`, development only)
 
 **In progress**
 
-- "Scan this wall": a guided camera for photographing a wall, and upload for processing
+- Photographing a wall in the app ("Scan this wall"), with models built on the team PC and published after review
 
 **Planned**
 
 - Saved routes, grade preferences and filters
 - Offline areas for crags with no signal
-- 3D models for more walls, made from climbers' scans
 
 The full list is in [docs/requirements.md](docs/requirements.md).
 
@@ -39,19 +39,18 @@ The full list is in [docs/requirements.md](docs/requirements.md).
 
 | Path | What's there |
 | --- | --- |
-| `mobile/` | The app: Expo, Expo Router and TypeScript, for iOS, Android and web. Includes the route author tool at `/author` |
-| `data/models/` | Wall models (`.glb`) and `index.json`, the list the author tool picks from. The app loads models from `main` on GitHub, so they stay in git |
-| `data/routes/` | Route lines drawn in the author tool, one file per model |
+| `mobile/` | The app: Expo, Expo Router and TypeScript, for iOS, Android and web. Includes the route drawing tool at `/author` |
+| `data/models/` | Wall models (`.glb`) for the route drawing tool, and `index.json`, its list. The app loads published models from Supabase |
+| `data/routes/` | Route lines saved by the drawing tool, one file per model |
 | `data/openbeta/` | Saved OpenBeta responses for the test wall |
-| `scripts/` | OpenBeta fetch, RealityScan pipeline, and the local server for `data/` |
+| `scripts/` | OpenBeta fetch, RealityScan pipeline, and the drawing tool's local server |
+| `supabase/` | Backend: database tables and access rules, the seed script and access checks |
 | `docs/` | Requirements, architecture, decisions and project notes |
 | `.github/` | CI, and the issue and pull request templates |
 
 ## Getting started
 
-Needs Node 22.13+, 24.3+ or 26+ (Expo SDK 58). Works the same on Mac and Windows.
-
-### App
+Needs Node 22.13+, 24.3+ or 26+.
 
 ```
 cd mobile
@@ -59,54 +58,26 @@ npm install
 npx expo start
 ```
 
-Press `w` for web, or scan the QR code with Expo Go on a phone on the same Wi-Fi. If the network blocks it, run `npx expo login` once, then `npx expo start --tunnel`. More, including settings and the checks to run before pushing, in [mobile/README.md](mobile/README.md).
+Press `w` for web, or scan the QR code with Expo Go (SDK 58) on a phone on the same Wi-Fi. The app already points at the team's backend, so there's nothing else to set up to browse.
 
-### Try the demo
-
-1. Start the app and press `w`
-2. In Explore, go to Utah › Wasatch Range › Northern Wasatch › Cache Valley › Logan Canyon › Date Wall, or search for "Date Wall"
-3. Tap **View the wall in 3D**, or open http://localhost:8081/walls/date-wall
-4. Tap a route in the list, or its line on the rock, to see its details
-
-On the Map, Date Wall is marked 3D. Three of its six routes are drawn so far; the [data README](data/README.md#demo-data) lists what's in the demo.
-
-### Drawing route lines
-
-The author tool is part of the app, at `/author`, in a desktop browser in development. It reads models and saves route lines through a small local server for `data/`, so run both, the server from the repo root:
-
-```
-node scripts/viewer/serve.mjs
-```
-
-```
-cd mobile
-npx expo start
-```
-
-Then open http://localhost:8081/author. Pick a model, then draw and save route lines. Details in [mobile/README.md](mobile/README.md#drawing-routes).
-
-### Making a wall model
-
-Needs a Windows PC with an NVIDIA GPU, RealityScan 2.2 installed through the Epic Games Launcher (the script looks for `RealityScan.exe` under `C:\Program Files\Epic Games`), and Node. The team does this on its own PC ([ADR 0001](docs/adr/0001-photogrammetry.md)).
-
-1. Photograph the wall using the [capture checklist](docs/capture-checklist.md)
-2. Process the photos with `scripts/realityscan/run.reproject.ps1 -Name <wall> -Imgs <photo folder>`. After RealityScan, it fixes up the export (`glb-finish.mjs`), swaps the texture for a JPEG (`glb-texture.mjs`, `-Quality 85` by default) and levels the model from the camera poses (`level.mjs`). It prints how many photos aligned and the size against the 15 MB budget. Alignment ignores the photos' GPS, because phone GPS is metres off and fitting the model to it tilted crag models by 35-55 degrees (`-UseGps` turns it back on)
-3. Runs go in `-Root`, which defaults to the team PC's `C:\Users\Garage\rs`. Copy `<Root>\<wall>\out\<wall>.glb` to `data/models/`, then follow [Adding a wall](data/README.md#adding-a-wall) to list it, draw its routes and show it in the app
+Everything else, including the backend, the route drawing tool and making wall models on the team PC, is in [docs/setup.md](docs/setup.md).
 
 ## Data
 
 Route and area data comes from [OpenBeta](https://openbeta.io) and is CC0. Coverage is uneven: length, bolts and descriptions are often missing. To fix or fill in a route, edit it on openbeta.io; the app shows OpenBeta's data, so the fix shows up here too. Details in [docs/openbeta.md](docs/openbeta.md).
 
-Wall models and route lines are files in [data/](data/README.md).
+Published wall models and their route lines come from the team's Supabase project ([ADR 0006](docs/adr/0006-supabase-backend.md)). The files in [data/](data/README.md) are the working copies the route drawing tool uses.
 
 ## Docs
 
+- [Setup](docs/setup.md): running every part of the project
 - [Requirements](docs/requirements.md): what we're building and why
 - [Architecture](docs/architecture/README.md): how the pieces fit, today and planned
-- [Data](data/README.md): the demo models, file formats, and adding a wall
+- [Data](data/README.md): the models and route files in the repo, and their formats
 - [OpenBeta data](docs/openbeta.md): how the app uses the API, and known gaps
 - [Capture checklist](docs/capture-checklist.md): photographing a wall
 - [Camera test](docs/camera-test.md): Expo's camera against the phone's own, for Milestone 2 (#48)
+- [Backend](supabase/README.md): tables, access rules and how to set up a new project
 - [Decisions](docs/adr/): architecture decision records
 - [Proof of concept](docs/poc-plan.md) and [Milestone 1 summary](docs/milestone-1.md)
 - [Work agreement](docs/work-agreement.md): how the team works

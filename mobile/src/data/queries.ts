@@ -1,14 +1,12 @@
 import { keepPreviousData, QueryClient, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 
-import { DATA_URL, LOCAL_DATA_URL, ROOT_AREA } from '@/core/config';
+import { ROOT_AREA } from '@/core/config';
 import { type MapView, visibleNodes } from '@/core/map';
 import { fetchArea, fetchClimb, fetchMapArea } from '@/core/openbeta/api';
-import { fetchRoutesFile } from '@/core/routes-file';
 import { MIN_QUERY_LENGTH, search } from '@/core/search';
 import type { MapArea, MapNode, Uuid } from '@/core/types';
-import { wallForArea } from '@/core/walls';
+import { usePublishedWalls } from '@/data/models';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,25 +29,6 @@ export function useClimb(uuid: Uuid) {
   return useQuery({
     queryKey: ['climb', uuid],
     queryFn: ({ signal }) => fetchClimb(uuid, signal),
-  });
-}
-
-/**
- * Where the Wall page reads models and route lines. A desktop browser on this
- * machine in development reads the local data/ folder, so newly saved lines show
- * right away. Phones and real builds read main on GitHub.
- */
-export const WALL_DATA_URL =
-  __DEV__ && Platform.OS === 'web' && ['localhost', '127.0.0.1'].includes(location.hostname)
-    ? LOCAL_DATA_URL
-    : DATA_URL;
-
-export function useRoutesFile(file: string) {
-  return useQuery({
-    queryKey: ['routes-file', file],
-    queryFn: ({ signal }) => fetchRoutesFile(WALL_DATA_URL, file, signal),
-    // Lines change whenever someone saves in the author tool.
-    staleTime: 0,
   });
 }
 
@@ -84,7 +63,8 @@ export function useMapDots(view: MapView) {
     }
   }, [missingKey]);
 
-  const dots: MapDot[] = nodes.map((n) => ({ ...n, hasModel: wallForArea(n.uuid) !== null }));
+  const published = usePublishedWalls().data;
+  const dots: MapDot[] = nodes.map((n) => ({ ...n, hasModel: published?.has(n.uuid) ?? false }));
   return { dots, loading: missing.length > 0, error };
 }
 

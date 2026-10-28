@@ -1,0 +1,16 @@
+{
+  "name": "climbingroutes-supabase",
+  "private": true,
+  "type": "module",
+  "description": "Seed and access checks for the team's Supabase project",
+  "scripts": {
+    "seed": "node --env-file=.env seed.mjs",
+    "check": "node --env-file=.env tests/rls-check.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0"
+  }
+}

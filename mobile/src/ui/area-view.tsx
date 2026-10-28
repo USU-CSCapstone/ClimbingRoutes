@@ -4,7 +4,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { ROOT_AREA } from '@/core/config';
 import type { Area, AreaSummary, ClimbSummary, Uuid } from '@/core/types';
-import { wallForArea } from '@/core/walls';
+import { useHasModel } from '@/data/models';
 import { useArea } from '@/data/queries';
 import {
   Breadcrumb,
@@ -76,16 +76,16 @@ export function AreaView({ uuid }: { uuid: Uuid }) {
 
 function AreaHeader({ area }: { area: Area }) {
   const hasOrder = area.climbs.some((c) => c.leftRightIndex != null);
-  const wall = wallForArea(area.uuid);
+  const hasModel = useHasModel(area.uuid);
   return (
     <View style={styles.header}>
       {area.path.length > 0 ? <Breadcrumb path={area.path} /> : null}
       <AppText type="title">{area.name}</AppText>
       <AppText color="textSecondary">{climbCount(area.totalClimbs)}</AppText>
       {area.description ? <AppText numberOfLines={6}>{area.description}</AppText> : null}
-      {wall ? (
+      {hasModel ? (
         <View style={styles.wallLink}>
-          <WallLink wall={wall} label="View the wall in 3D" />
+          <WallLink wallUuid={area.uuid} label="View in 3D" />
         </View>
       ) : null}
       {/* Throwaway: the camera test for issue #48. Remove with app/camera-test.tsx. */}

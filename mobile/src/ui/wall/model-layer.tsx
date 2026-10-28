@@ -3,10 +3,8 @@ import { lazy, Suspense } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
-import { LOCAL_DATA_URL } from '@/core/config';
+import { modelUrl, type PublishedModel } from '@/core/models';
 import type { Uuid } from '@/core/types';
-import type { Wall } from '@/core/walls';
-import { WALL_DATA_URL } from '@/data/queries';
 import { DOM_WEBVIEW } from '@/ui/dom';
 import { AppText } from '@/ui/text';
 import type { Insets, ModelInfo, ViewerRoute } from '@/viewer/types';
@@ -27,7 +25,7 @@ export interface ModelStatus {
 
 /** The 3D model behind everything else on the Wall page, with its loading and error states. */
 export function ModelLayer({
-  wall,
+  model,
   lines,
   highlighted,
   insets,
@@ -41,7 +39,7 @@ export function ModelLayer({
   onEmptyTap,
   onFps,
 }: {
-  wall: Wall;
+  model: PublishedModel;
   lines: ViewerRoute[];
   highlighted: Uuid | null;
   insets: Insets;
@@ -67,7 +65,8 @@ export function ModelLayer({
       <Suspense fallback={null}>
         <WallViewer
           key={status.attempt}
-          model={`${WALL_DATA_URL}/models/${encodeURIComponent(wall.model)}`}
+          model={modelUrl(model.glbPath)}
+          cache={{ key: model.glbPath, group: model.wallUuid }}
           routes={lines}
           highlighted={highlighted}
           insets={insets}
@@ -90,11 +89,6 @@ export function ModelLayer({
           <AppText type="small" style={styles.detail} numberOfLines={3}>
             {status.error}
           </AppText>
-          {WALL_DATA_URL === LOCAL_DATA_URL ? (
-            <AppText type="small" style={styles.detail}>
-              Models come from the data server. Start it from the repo root with node scripts/viewer/serve.mjs
-            </AppText>
-          ) : null}
           <Pressable role="button" onPress={onRetry} style={({ pressed }) => [styles.retry, pressed && styles.pressed]}>
             <Ionicons name="refresh" size={20} color={VIEWER_BACKGROUND} />
             <AppText style={styles.retryText}>Try again</AppText>
