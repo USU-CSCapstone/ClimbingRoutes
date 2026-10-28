@@ -14,6 +14,3 @@ export const DATA_URL = 'https://raw.githubusercontent.com/USU-CSCapstone/Climbi
 
 /** The local data/ folder, served by scripts/viewer/serve.mjs. The author tool reads and saves here. */
 export const LOCAL_DATA_URL = 'http://localhost:8765/data';
-
-/** Walls with a 3D model in data/models. Date Wall is the POC test wall. */
-export const WALLS_WITH_MODELS: string[] = ['8c45d40d-363d-5a9b-9659-3df50c5d3916'];

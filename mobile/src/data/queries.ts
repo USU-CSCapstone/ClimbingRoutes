@@ -2,12 +2,13 @@ import { keepPreviousData, QueryClient, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
-import { DATA_URL, LOCAL_DATA_URL, ROOT_AREA, WALLS_WITH_MODELS } from '@/core/config';
+import { DATA_URL, LOCAL_DATA_URL, ROOT_AREA } from '@/core/config';
 import { type MapView, visibleNodes } from '@/core/map';
 import { fetchArea, fetchClimb, fetchMapArea } from '@/core/openbeta/api';
 import { fetchRoutesFile } from '@/core/routes-file';
 import { MIN_QUERY_LENGTH, search } from '@/core/search';
 import type { MapArea, MapNode, Uuid } from '@/core/types';
+import { wallForArea } from '@/core/walls';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,7 +84,7 @@ export function useMapDots(view: MapView) {
     }
   }, [missingKey]);
 
-  const dots: MapDot[] = nodes.map((n) => ({ ...n, hasModel: WALLS_WITH_MODELS.includes(n.uuid) }));
+  const dots: MapDot[] = nodes.map((n) => ({ ...n, hasModel: wallForArea(n.uuid) !== null }));
   return { dots, loading: missing.length > 0, error };
 }
 

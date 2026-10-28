@@ -36,15 +36,31 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 - Tapping a route in the list moves the camera to it. Tapping a line selects that route
 - The camera stays within a front arc of the wall, because the model has no back side
 - Models download with their area for offline use
-- **Made by the team for now.** We photograph a wall, process it on the team PC with RealityScan ([ADR 0001](adr/0001-photogrammetry.md)), and draw the routes in our desktop tool (`viewer/`). Capture steps are in the [capture checklist](capture-checklist.md)
+- **Made by the team for now.** We photograph a wall, process it on the team PC with RealityScan ([ADR 0001](adr/0001-photogrammetry.md)), and draw the routes in the app's author tool (`/author`, development only). Capture steps are in the [capture checklist](capture-checklist.md)
+
+### Photo capture and upload (Milestone 2, in progress)
+
+Climbers scan a wall themselves in the app, and the photos go to the team to be made into a model. Milestone 2 covers capturing and uploading; making the model stays a manual step on the team PC for now.
+
+- **Scan this wall:** a wall page with no model offers a scan, and an unfinished scan can be picked up again (#49)
+- **Guide:** the capture checklist as a few swipeable cards, a check for direct sun, and a photo target from the wall's size (#50)
+- **Guided camera:** the back 1x lens, a photo count and "step right" prompts, with each photo saved as it's taken (#51)
+- **Review and import:** look through the photos, delete or add more, or pick them from the photo library, which is the only option on the web. Upload needs at least 16 photos (#52)
+- **Upload:** one photo at a time, on Wi-Fi by default, carrying on after a restart (#45). Photos go to Supabase storage, with anonymous sign-in until accounts exist (#43)
+- **Processing:** a script on the team PC downloads each scan (#46). Photos are deleted from the phone once they're uploaded, and from Supabase and the team PC once the model is made (#45, #47)
+- **Stays in Expo Go,** so the camera is `expo-camera`. #48 compares its photos with the phone's own camera ([camera-test.md](camera-test.md))
 
 ## Technical approach
 
 - **App:** Expo with Expo Router and TypeScript, in `mobile/`. Data loading and caching use React Query. Screens get data through `src/data/` and never call the network directly, so offline storage can be added later without changing them
 - **Route data:** the OpenBeta GraphQL API. It's free, needs no key, and the data is CC0. See [openbeta.md](openbeta.md)
 - **Search:** openbeta.io's own search server. If it fails, the app falls back to GraphQL area search, which can't find routes
-- **3D:** Three.js through React Three Fiber, on web and native
-- **Model pipeline:** `scripts/realityscan/run.reproject.ps1` then `glb-finish.mjs`, which produce a single GLB per wall
+- **3D:** plain three.js in an Expo DOM component, the same code on web and native ([ADR 0004](adr/0004-wall-viewer.md))
+- **Model pipeline:** `scripts/realityscan/run.reproject.ps1` runs RealityScan, then `glb-finish.mjs`, `glb-texture.mjs` and `level.mjs`, to produce a single GLB per wall ([ADR 0005](adr/0005-wall-model-format.md))
+- **Wall data:** models and route lines are files in `data/`, and the app loads them from GitHub ([ADR 0007](adr/0007-model-hosting.md))
+- **Uploads:** Supabase storage and a captures table, from Milestone 2 (ADR 0006, #43)
+
+How the pieces connect is in [architecture](architecture/README.md).
 - **Team setup:** one developer on a Mac and one on Windows, both with iPhones. Everything has to work from Windows, in the browser and in Expo Go
 
 ## What the proof of concept showed
@@ -65,11 +81,11 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 ## Open questions
 
 - **Search access.** The openbeta.io search server isn't a documented API, and its read-only key comes from their website code. Should we ask OpenBeta for access, or build our own index from their data export?
-- **Backend.** Phase 1 doesn't need one. Do we need one to host models?
-- **Model hosting.** Models are 10–200 MB and don't belong in plain git. Git LFS, or file storage with a list of models?
+- **Backend.** Milestone 2 adds Supabase for photo uploads (#43). Should the same project host models, accounts and moderation later?
+- **Model hosting.** For now models stay in git and the app loads them from GitHub ([ADR 0007](adr/0007-model-hosting.md)). That won't scale to climbers' uploads, so where do models live once there are many?
 - **Model size.** 300k, 1M or 8M triangles? Should we offer a lighter version on slow connections?
 - **Route-line format.** Save the surface-following points so phones don't recompute them, and name the exact model each file belongs to
-- **3D on phones.** Is React Three Fiber smooth enough in the native app? Test with one model and one route before building the viewer screen
+- **3D on phones.** The viewer runs in a webview on phones ([ADR 0004](adr/0004-wall-viewer.md)). Is it smooth enough with 8K textures on older phones?
 
 ## Success criteria
 
@@ -81,7 +97,7 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 
 ## Later
 
-- Guided photo capture and upload by users
+- Making models from climbers' uploads without a person running each step
 - Boulders, with full walk-around models
 - AR: preview a wall model on a table, or overlay routes on the real wall
 - Measurements from the model, such as route height and overhang angle

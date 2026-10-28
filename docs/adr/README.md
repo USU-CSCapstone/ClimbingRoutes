@@ -11,3 +11,5 @@ To add one, copy `template.md` to `NNNN-short-title.md` using the next number, f
 | [0003](0003-openbeta-data.md) | OpenBeta for route data | Accepted |
 | [0004](0004-wall-viewer.md) | Wall viewer as plain three.js in an Expo DOM component | Accepted |
 | [0005](0005-wall-model-format.md) | One GLB per wall | Accepted |
+| 0006 | Supabase for scan uploads | Being written (#43) |
+| [0007](0007-model-hosting.md) | Wall models in git, served from GitHub | Accepted |

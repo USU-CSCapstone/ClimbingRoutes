@@ -2,6 +2,8 @@
 
 Agreed 2026-10-05.
 
+How the two-person team works day to day. Contributors from outside the team: see [CONTRIBUTING.md](../CONTRIBUTING.md).
+
 ## Process
 
 - Follow a Scrum workflow, with standups three times a week

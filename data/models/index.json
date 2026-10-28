@@ -2,13 +2,18 @@
   "models": [
     {
       "file": "wall47.glb",
-      "name": "Crag · 47 photos (sets 16 + 31)",
-      "notes": "1M triangles, two 8K textures"
+      "name": "Date Wall · 47 photos (sets 16 + 31)",
+      "notes": "1M triangles, two 8K textures. The Date Wall page uses this model"
     },
     {
       "file": "crag16.glb",
-      "name": "Crag · 16 photos (run.reproject.ps1)",
-      "notes": "Script defaults: 300k triangles, one 8K texture"
+      "name": "Date Wall · 16 photos (run.reproject.ps1)",
+      "notes": "Script defaults: 300k triangles, one 8K texture. An earlier run, kept for comparison"
+    },
+    {
+      "file": "wallpics01.glb",
+      "name": "wallpics01 · JPEG texture",
+      "notes": "300k triangles, one JPEG texture. No routes drawn yet"
     }
   ]
 }

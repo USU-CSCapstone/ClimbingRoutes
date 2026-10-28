@@ -16,6 +16,7 @@ export interface Wall {
   routes: string;
 }
 
+/** Adding a wall here links its area page to /walls/<id> and marks it 3D on the map. Steps in data/README.md. */
 export const WALLS: Wall[] = [
   {
     id: 'date-wall',
