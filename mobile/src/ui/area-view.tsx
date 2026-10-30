@@ -17,6 +17,7 @@ import {
   WallLink,
 } from '@/ui/components';
 import { useHrefs } from '@/ui/nav';
+import { ScanCard, useNeedsScan } from '@/ui/scan-card';
 import { AppText } from '@/ui/text';
 
 type Item =
@@ -76,6 +77,7 @@ export function AreaView({ uuid }: { uuid: Uuid }) {
 function AreaHeader({ area }: { area: Area }) {
   const hasOrder = area.climbs.some((c) => c.leftRightIndex != null);
   const hasModel = useHasModel(area.uuid);
+  const needsScan = useNeedsScan(area);
   return (
     <View style={styles.header}>
       {area.path.length > 0 ? <Breadcrumb path={area.path} /> : null}
@@ -85,6 +87,11 @@ function AreaHeader({ area }: { area: Area }) {
       {hasModel ? (
         <View style={styles.wallLink}>
           <WallLink wallUuid={area.uuid} label="View in 3D" />
+        </View>
+      ) : null}
+      {needsScan ? (
+        <View style={styles.wallLink}>
+          <ScanCard wallUuid={area.uuid} />
         </View>
       ) : null}
       {area.climbs.length > 0 ? (

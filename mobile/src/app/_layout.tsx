@@ -9,7 +9,10 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          {/* The scan flow covers the whole screen, tab bar included, and has its own Close button. */}
+          <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
+        </Stack>
       </ThemeProvider>
     </QueryClientProvider>
   );

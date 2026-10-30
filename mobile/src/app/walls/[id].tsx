@@ -1,8 +1,11 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useLatestModel } from '@/data/models';
 import { useArea } from '@/data/queries';
 import { Loading, Message } from '@/ui/components';
+import { ScanCard } from '@/ui/scan-card';
 import { WallView } from '@/ui/wall/wall-view';
 
 /** /walls/<OpenBeta area uuid>?route=<uuid> opens the wall's newest published model, with that route selected. */
@@ -18,6 +21,16 @@ export default function WallScreen() {
       <>
         <Stack.Screen options={{ headerShown: true, title: 'Wall' }} />
         <Message title="Couldn't open the 3D wall" detail={error.message} />
+      </>
+    );
+  }
+  if (!model.data && area.data?.isLeaf && !area.data.isBoulder) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: true, title: area.data.name }} />
+        <View style={styles.noModel}>
+          <ScanCard wallUuid={area.data.uuid} />
+        </View>
       </>
     );
   }
@@ -38,3 +51,14 @@ export default function WallScreen() {
     />
   );
 }
+
+const styles = StyleSheet.create({
+  noModel: {
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    padding: Spacing.three,
+  },
+});
