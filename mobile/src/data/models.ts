@@ -23,9 +23,14 @@ export function usePublishedWalls() {
       if (error) throw new Error(`Couldn't load the 3D walls: ${error.message}`);
       return [...new Set(data.map((m) => m.wall_uuid))];
     }),
-    select: (uuids: Uuid[]) => new Set(uuids),
+    select: toSet,
     staleTime: MODELS_STALE_MS,
   });
+}
+
+// Module-level, so React Query keeps the same Set until the walls change.
+function toSet(uuids: Uuid[]): Set<Uuid> {
+  return new Set(uuids);
 }
 
 /** True once the wall is known to have a published model. */

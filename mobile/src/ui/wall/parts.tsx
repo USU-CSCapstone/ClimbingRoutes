@@ -12,7 +12,7 @@ import {
 
 import { Colors, Difficulty, Spacing, TapTarget, UngradedLine } from '@/constants/theme';
 import { difficultyBand, gradeValue } from '@/core/grades';
-import type { Area, Grade, Uuid } from '@/core/types';
+import type { Crumb, Grade, Uuid } from '@/core/types';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { climbCount, disciplineText } from '@/ui/components';
@@ -152,7 +152,7 @@ export function GradeSpread({ routes }: { routes: ShownRoute[] }) {
 }
 
 /** Where the wall is, like "Logan Canyon, Utah". */
-export function placeName(area: Area | null | undefined): string | null {
+export function placeName(area: { path: Crumb[] } | null | undefined): string | null {
   const parent = area?.path.at(-1)?.name;
   if (!area || !parent) return null;
   const state = area.path[1]?.name;

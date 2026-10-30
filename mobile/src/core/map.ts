@@ -14,7 +14,7 @@ export interface MapView {
 /** Room each child dot needs, in pixels, before its area splits. */
 const DOT_ROOM = 60;
 /** At this zoom every area splits, even if its children share one point. */
-export const ALWAYS_SPLIT_ZOOM = 14;
+const ALWAYS_SPLIT_ZOOM = 14;
 
 /**
  * Walks down from `root`, splitting areas near the view. Returns the dots to
@@ -77,11 +77,32 @@ export function visibleNodes(
 /** Splits once the children spread far enough on screen that they'd rarely overlap. */
 function shouldSplit(area: MapArea, extent: BBox, view: MapView): boolean {
   if (area.children.length === 1 || view.zoom >= ALWAYS_SPLIT_ZOOM) return true;
-  const spreadPx = Math.max(
+  return spreadPx(extent, view) >= roomNeeded(area);
+}
+
+/**
+ * The lowest zoom, from the current view, at which `area` splits into its
+ * children, so moving the map there shows them all. Each zoom level doubles
+ * their spread on screen.
+ */
+export function splitZoom(area: MapArea, view: MapView): number {
+  const extent = extentOf(area.children);
+  if (!extent || shouldSplit(area, extent, view)) return view.zoom;
+  // A little past the threshold, so rounding doesn't leave it just short. Children that share one
+  // point only split at ALWAYS_SPLIT_ZOOM.
+  return Math.min(ALWAYS_SPLIT_ZOOM, view.zoom + Math.log2(roomNeeded(area) / spreadPx(extent, view)) + 0.05);
+}
+
+/** How far apart the children are on screen, in pixels. */
+function spreadPx(extent: BBox, view: MapView): number {
+  return Math.max(
     ((extent[2] - extent[0]) / (view.bbox[2] - view.bbox[0])) * view.width,
     ((extent[3] - extent[1]) / (view.bbox[3] - view.bbox[1])) * view.height,
   );
-  return spreadPx >= DOT_ROOM * Math.sqrt(area.children.length);
+}
+
+function roomNeeded(area: MapArea): number {
+  return DOT_ROOM * Math.sqrt(area.children.length);
 }
 
 function extentOf(nodes: MapNode[]): BBox | null {

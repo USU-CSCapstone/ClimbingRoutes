@@ -1,4 +1,4 @@
-import { keepPreviousData, QueryClient, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { ROOT_AREA } from '@/core/config';
@@ -51,10 +51,10 @@ export function useMapDots(view: MapView) {
     if (!missingKey) return;
     for (const uuid of missingKey.split(',')) {
       queryClient
-        .fetchQuery({ queryKey: ['mapArea', uuid], queryFn: ({ signal }) => fetchMapArea(uuid, signal) })
+        .fetchQuery(mapAreaQuery(uuid))
         .then((area) => {
           // An area OpenBeta can't find is stored empty so it isn't asked for again.
-          setAreas((prev) => new Map(prev).set(uuid, area ?? { uuid, bbox: null, children: [] }));
+          setAreas((prev) => new Map(prev).set(uuid, area ?? { uuid, path: [], bbox: null, children: [] }));
         })
         .catch((e: Error) => {
           // Only the root failing leaves the map empty; other areas stay one dot.
@@ -63,17 +63,34 @@ export function useMapDots(view: MapView) {
     }
   }, [missingKey]);
 
-  const published = usePublishedWalls().data;
-  const dots: MapDot[] = nodes.map((n) => ({ ...n, hasModel: published?.has(n.uuid) ?? false }));
+  const dots = useWithModels(nodes);
   return { dots, split, loading: missing.length > 0, error };
 }
 
-/** An area's children as the map draws them: those with a location and routes. Shares the map's cache. */
+/**
+ * An area as the map draws it, with its children (those with a location and
+ * routes) by name. Shares the map's cache.
+ */
 export function useMapArea(uuid: Uuid) {
-  return useQuery({
-    queryKey: ['mapArea', uuid],
-    queryFn: ({ signal }) => fetchMapArea(uuid, signal),
-  });
+  const { data, isPending, error } = useQuery({ ...mapAreaQuery(uuid), select: childrenByName });
+  return { area: data, children: useWithModels(data?.children ?? []), isPending, error };
+}
+
+// No abort signal: React Query cancels a fetch that read it once its last observer goes, and an area's
+// panel is often the only observer of a fetch the map is waiting on too. Closing the panel mid-load
+// would then drop the map's copy, leaving that area unsplit.
+function mapAreaQuery(uuid: Uuid) {
+  return queryOptions({ queryKey: ['mapArea', uuid], queryFn: () => fetchMapArea(uuid) });
+}
+
+function childrenByName(area: MapArea | null): MapArea | null {
+  return area && { ...area, children: [...area.children].sort((a, b) => a.name.localeCompare(b.name)) };
+}
+
+/** Map nodes marked with whether each wall has a published 3D model. */
+function useWithModels(nodes: MapNode[]): MapDot[] {
+  const published = usePublishedWalls().data;
+  return nodes.map((n) => ({ ...n, hasModel: published?.has(n.uuid) ?? false }));
 }
 
 export function useSearch(query: string) {

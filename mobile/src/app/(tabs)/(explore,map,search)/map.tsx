@@ -3,16 +3,16 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, type StyleProp, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import type { MapView } from '@/core/map';
-import type { BBox, MapNode } from '@/core/types';
-import { useHasModel, useLatestModel, usePublishedWalls } from '@/data/models';
-import { type MapDot, useArea, useMapArea, useMapDots } from '@/data/queries';
+import { type MapView, splitZoom } from '@/core/map';
+import type { BBox, MapArea, MapNode } from '@/core/types';
+import { useHasModel, useLatestModel } from '@/data/models';
+import { useMapArea, useMapDots } from '@/data/queries';
 import { AreaPanel } from '@/ui/area-panel';
 import { Message, WallLink } from '@/ui/components';
 import { DOM_WEBVIEW } from '@/ui/dom';
 import { useHrefs } from '@/ui/nav';
 import { PANEL_WIDTH, WIDE } from '@/ui/side-panel';
-import WallMap, { type MapFocus } from '@/ui/wall-map';
+import WallMap, { type WallMapRef } from '@/ui/wall-map';
 import { placeName } from '@/ui/wall/parts';
 import { useWallRoutes } from '@/ui/wall/use-wall-routes';
 import { WallPanel } from '@/ui/wall/wall-panel';
@@ -37,14 +37,14 @@ export default function MapScreen() {
   // Replaced by the real view as soon as the map loads.
   const [view, setView] = useState<MapView>({ bbox: USA_BOUNDS, zoom: 3, width: 1, height: 1 });
   const [selection, setSelection] = useState<Selection | null>(null);
-  const [focus, setFocus] = useState<MapFocus | null>(null);
   const [mapHeight, setMapHeight] = useState(0);
   const { dots, split, error } = useMapDots(view);
   const { width } = useWindowDimensions();
+  const mapRef = useRef<WallMapRef>(null);
 
   // Zooming out or panning away can fold the picked dot into its parent. That closes its panel for good,
-  // rather than reopening it when the dot comes back. A dot picked from a list may not have loaded yet,
-  // so it only counts once the map has shown it.
+  // rather than reopening it when the dot comes back. A dot only counts once the map has shown it, since
+  // one picked from a list may not have loaded yet.
   const selected = selection?.node ?? null;
   const onMap = selected != null && (dots.some((d) => d.uuid === selected.uuid) || split.includes(selected.uuid));
   if (selection && onMap && !selection.seen) setSelection({ ...selection, seen: true });
@@ -60,25 +60,26 @@ export default function MapScreen() {
   // How far the panel reaches in from its edge, margins included.
   const covered = wide ? PANEL_WIDTH + 2 * EDGE : phoneHeight + PHONE_BOTTOM;
   const close = () => setSelection(null);
-  /** A wall or area picked from a panel's list: opens its panel and moves the map to it. */
-  const pick = (node: MapNode) => {
+  /**
+   * A wall or area picked from `parent`'s list: opens its panel and moves the map to it, zoomed in at
+   * least far enough for `parent` to split so it shows. An area zooms in a step more, as a tap does.
+   */
+  const pick = (node: MapNode, parent: MapArea) => {
     setSelection({ node, seen: false });
-    setFocus((f) => ({ location: node.location, isLeaf: node.isLeaf, seq: (f?.seq ?? 0) + 1 }));
+    const zoom = Math.max(node.isLeaf ? view.zoom : view.zoom + 2, splitZoom(parent, view));
+    mapRef.current?.moveTo(node.location.lng, node.location.lat, zoom);
   };
 
   return (
     <View style={styles.screen} onLayout={(e) => setMapHeight(e.nativeEvent.layout.height)}>
       <WallMap
+        ref={mapRef}
         initialBounds={USA_BOUNDS}
         dots={dots}
         selected={selected?.uuid ?? null}
-        onSelect={async (uuid) => {
-          const dot = dots.find((d) => d.uuid === uuid);
-          setSelection(dot ? { node: dot, seen: true } : null);
-        }}
+        onSelect={async (node) => setSelection(node && { node, seen: false })}
         onViewChange={async (v) => setView(v)}
         panelOffset={wide ? [covered / 2, 0] : [0, -covered / 2]}
-        focus={focus}
         dom={{ ...DOM_WEBVIEW, style: styles.screen, scrollEnabled: false, bounces: false }}
       />
       {/* A wall opens its routes, as on its 3D page; an area opens its walls and sub-areas. */}
@@ -132,30 +133,25 @@ function AreaDetails({
   onBack,
 }: {
   node: MapNode;
-  onPick: (node: MapNode) => void;
+  onPick: (node: MapNode, parent: MapArea) => void;
   onBack: () => void;
 }) {
-  const children = useMapArea(node.uuid);
-  const area = useArea(node.uuid);
-  const published = usePublishedWalls().data;
-  const items: MapDot[] = (children.data?.children ?? [])
-    .map((c) => ({ ...c, hasModel: published?.has(c.uuid) ?? false }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const message = children.isPending
+  const { area, children, isPending, error } = useMapArea(node.uuid);
+  const message = isPending
     ? 'Loading…'
-    : children.error
-      ? `Couldn't load this area: ${children.error.message}`
-      : items.length === 0
+    : error
+      ? `Couldn't load this area: ${error.message}`
+      : children.length === 0
         ? 'OpenBeta has nothing here to show on the map'
         : null;
   return (
     <AreaPanel
       name={node.name}
-      place={placeName(area.data)}
+      place={placeName(area)}
       totalClimbs={node.totalClimbs}
-      items={items}
+      items={children}
       message={message}
-      onPress={onPick}
+      onPress={(child) => area && onPick(child, area)}
       onBack={onBack}
       backLabel="Close"
       style={styles.fill}

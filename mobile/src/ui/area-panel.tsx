@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { FlatList, Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
+import { FlatList, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { Spacing, TapTarget } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import type { MapDot } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
-import { climbCount } from '@/ui/components';
+import { climbCount, count, LinkRow } from '@/ui/components';
 import { PanelHeader, PanelLabel, panelListStyle, SidePanel } from '@/ui/side-panel';
 import { AppText } from '@/ui/text';
 import { FactChips } from '@/ui/wall/parts';
@@ -67,55 +67,32 @@ function areaFacts(totalClimbs: number, items: MapDot[]): string[] {
   ].filter((f): f is string => f != null);
 }
 
-function count(n: number, noun: string): string {
-  return `${n.toLocaleString()} ${noun}${n === 1 ? '' : 's'}`;
-}
-
 function ItemRow({ item, onPress }: { item: MapDot; onPress: (item: MapDot) => void }) {
   const theme = useTheme();
   const subtitle = `${item.isLeaf ? 'Wall' : 'Area'} · ${climbCount(item.totalClimbs)}`;
   return (
-    <Pressable
-      role="button"
-      accessibilityLabel={[item.name, subtitle, item.hasModel ? 'has a 3D model' : null].filter(Boolean).join(', ')}
+    <LinkRow
       onPress={() => onPress(item)}
-      style={({ pressed }) => [
-        styles.row,
-        { borderBottomColor: theme.border },
-        pressed && { backgroundColor: theme.backgroundElement },
-      ]}>
-      <View style={styles.rowText}>
-        <AppText numberOfLines={1} style={styles.rowTitle}>
-          {item.name}
-        </AppText>
-        <AppText type="small" color="textSecondary" numberOfLines={1}>
-          {subtitle}
-        </AppText>
-      </View>
-      {item.hasModel ? (
-        <View style={[styles.model, { backgroundColor: theme.accent }]}>
-          <AppText type="small" style={[styles.modelText, { color: theme.accentText }]}>
-            3D
-          </AppText>
-        </View>
-      ) : null}
-      <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-    </Pressable>
+      title={item.name}
+      subtitle={subtitle}
+      accessibilityLabel={[item.name, subtitle, item.hasModel ? 'has a 3D model' : null].filter(Boolean).join(', ')}
+      trailing={
+        <>
+          {item.hasModel ? (
+            <View style={[styles.model, { backgroundColor: theme.accent }]}>
+              <AppText type="small" style={[styles.modelText, { color: theme.accentText }]}>
+                3D
+              </AppText>
+            </View>
+          ) : null}
+          <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+        </>
+      }
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    minHeight: TapTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  rowText: { flex: 1 },
-  rowTitle: { fontWeight: '600' },
   model: { paddingHorizontal: Spacing.two, paddingVertical: Spacing.half, borderRadius: 6 },
   modelText: { fontWeight: '700' },
 });
