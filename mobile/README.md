@@ -15,22 +15,44 @@ npx expo start
 - **Web:** press `w`, or open http://localhost:8081
 - **iPhone:** install Expo Go, then scan the QR code with the Camera app. Expo Go must be the version for SDK 58. Phone and computer must be on the same Wi-Fi. If the school network blocks it, run `npx expo login` once, then `npx expo start --tunnel`
 
-Before pushing:
+Before pushing, run the same checks as CI:
 
 ```
 npx tsc --noEmit
 npx expo lint
+npx expo export --platform web
 ```
+
+There are no automated tests yet, so also try your change on the web and in Expo Go.
+
+There are no standalone builds yet either: the project has no EAS setup (`eas.json`), and everything runs in Expo Go and the browser.
+
+## Configuration
+
+Settings are constants in `src/core/config.ts`. The keys there are public by design: openbeta.io's read-only search key and Supabase's publishable key.
+
+| Constant | What it's for |
+| --- | --- |
+| `OPENBETA_GRAPHQL_URL` | OpenBeta's GraphQL API, for areas, routes and the map |
+| `TYPESENSE_URL`, `TYPESENSE_KEY` | openbeta.io's search server and its read-only key (see Data below) |
+| `ROOT_AREA` | Where Explore and the map start, and what search covers: the USA |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | The team's Supabase project, for accounts, wall models and route lines. Row-level security protects the data, so both can be public. Never put the secret key in the app |
+| `LOCAL_DATA_URL` | Where `/author` reads models and saves route lines: the local `data/` folder, through `scripts/viewer/serve.mjs` on port 8765 |
+
+- **Port:** `serve.mjs` takes a port (`node scripts/viewer/serve.mjs 9000`), but the app always looks on 8765, so change `LOCAL_DATA_URL` to match
+- **Walls with a model** are the walls with a published model in Supabase. To publish one, see [docs/setup.md](../docs/setup.md#draw-route-lines)
 
 ## Drawing routes
 
-The author tool at `/author` draws route lines on a wall's model and saves them to `data/routes/`. It only exists in development, in a desktop browser. It reads and saves through a small server for the repo's `data/` folder, so run that too, from the repo root:
+The author tool at `/author` draws route lines on a wall's model and saves them to `data/routes/`. It isn't working right now: it loads models from `data/models/`, which was removed when the models moved to Supabase storage, and it will load them from Supabase instead.
+
+It only exists in development, in a desktop browser. It reads and saves through a small server for the repo's `data/` folder, so run that too, from the repo root:
 
 ```
 node scripts/viewer/serve.mjs
 ```
 
-Then open http://localhost:8081/author. `?model=crag16.glb` picks a model from `data/models/index.json`. Pick a route, click **Draw**, and click holds from the start upward. **Save routes** writes `data/routes/<model>.json`; commit that file to share the lines.
+Then open http://localhost:8081/author. Pick a route, click **Draw**, and click holds from the start upward. **Save routes** writes `data/routes/<model>.json`; commit that file to share the lines. To publish a wall with its lines, see [docs/setup.md](../docs/setup.md#draw-route-lines).
 
 ## Layout
 

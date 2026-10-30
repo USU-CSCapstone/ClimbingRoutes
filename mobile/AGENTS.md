@@ -31,6 +31,8 @@ Run lint and typecheck before declaring any task done.
 
 ## Building with EAS
 
+This project has no EAS setup yet (no `eas.json`): the app runs in Expo Go and on the web. Set it up only when a task needs a standalone or development build.
+
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 

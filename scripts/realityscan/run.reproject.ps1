@@ -20,6 +20,7 @@
 #         .\run.reproject.ps1 -Name test04 -Triangles 500000 -Quality 80
 #         .\run.reproject.ps1 -UseGps          (fit the model to the photos' GPS, as before)
 #         .\run.reproject.ps1 -DryRun          (print the commands, run nothing)
+#         .\run.reproject.ps1 -Root D:\rs      (work folder on a machine other than the team PC)
 param(
   [string]$Name = "test03",
   [int]$Triangles = 300000,
@@ -27,6 +28,8 @@ param(
   # not exported, so more than one just makes the copied texture sharper.
   [int]$DenseTextures = 4,
   [string]$Imgs = "C:\Users\Garage\Downloads\test-images",
+  # Each run goes in <Root>\<Name>, and an optional <Root>\wall.rsbox sets the region.
+  [string]$Root = "C:\Users\Garage\rs",
   [ValidateRange(1, 100)][int]$Quality = 85,
   [switch]$UseGps,
   [switch]$DryRun
@@ -37,15 +40,15 @@ $RS = (Get-ChildItem "C:\Program Files\Epic Games" -Recurse -Filter "RealityScan
        Select-Object -First 1).FullName
 if (-not $RS) { throw "RealityScan.exe not found" }
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "node not found; the glb scripts need Node.js" }
-$Here = if ($PSScriptRoot) { $PSScriptRoot } else { "C:\Users\Garage\rs" }
+$Here = if ($PSScriptRoot) { $PSScriptRoot } else { $Root }
 $Finish  = Join-Path $Here "glb-finish.mjs"
 $Texture = Join-Path $Here "glb-texture.mjs"
 $Level   = Join-Path $Here "level.mjs"
 foreach ($f in $Finish, $Texture, $Level, (Join-Path $Here "glb.mjs")) { if (-not (Test-Path $f)) { throw "Missing $f" } }
 Write-Host "Using $RS"
 
-$Proj   = "C:\Users\Garage\rs\$Name"
-$Box    = "C:\Users\Garage\rs\wall.rsbox"
+$Proj   = "$Root\$Name"
+$Box    = "$Root\wall.rsbox"
 $Raw    = "$Proj\out\${Name}_raw.glb"           # RealityScan's export, with an external PNG
 $Png    = "$Proj\out\${Name}_png.glb"           # glb-finish.mjs, PNG embedded
 $Jpg    = "$Proj\out\${Name}_diffuse_q$Quality.jpg"

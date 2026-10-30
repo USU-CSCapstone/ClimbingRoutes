@@ -10,7 +10,8 @@
     {
       "name": "app",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["mobile/node_modules/expo/bin/cli", "start", "mobile", "--port", "8082"],
+      "runtimeArgs": ["node_modules/expo/bin/cli", "start", "--port", "8082"],
+      "cwd": "mobile",
       "port": 8082
     }
   ]

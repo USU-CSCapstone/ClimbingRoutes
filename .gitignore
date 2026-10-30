@@ -1,11 +1,11 @@
-# Finished models (data/models/*.glb) and saved routes (data/routes/*.json) ARE tracked.
+# Saved routes (data/routes/*.json) ARE tracked. Wall models live in Supabase storage, not in git.
 
 # Raw photo captures: too large for git; keep photo sets outside the repo
 *.heic
 *.HEIC
 rsmeta.db
 
-# RealityScan projects and intermediate exports (only the finished GLB belongs in data/models/)
+# RealityScan projects and intermediate exports (finished GLBs go to Supabase storage, not git)
 *.rsproj
 *.rsInfo
 *.imagelist
