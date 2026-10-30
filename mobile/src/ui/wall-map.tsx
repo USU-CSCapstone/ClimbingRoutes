@@ -2,14 +2,21 @@
 
 // A DOM component: MapLibre runs as-is on web and in a WebView on iOS and
 // Android, so the map works in Expo Go with no native build.
-import type { ExpressionSpecification, MapLibreEvent } from 'maplibre-gl';
+import { type DOMImperativeFactory, useDOMImperativeHandle } from 'expo/dom';
+import type { ExpressionSpecification, MapLibreEvent, Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useState } from 'react';
-import { AttributionControl, Layer, Map, NavigationControl, Source } from 'react-map-gl/maplibre';
+import { type Ref, useEffect, useRef, useState } from 'react';
+import { AttributionControl, Layer, Map, type MapRef, NavigationControl, Source } from 'react-map-gl/maplibre';
 
 import type { MapView } from '@/core/map';
-import type { BBox, Uuid } from '@/core/types';
+import type { BBox, MapNode, Uuid } from '@/core/types';
 import type { MapDot } from '@/data/queries';
+
+/** Moves the map from outside it, such as when a panel's list picks a dot. */
+export interface WallMapRef extends DOMImperativeFactory {
+  /** Takes lng, lat and zoom. Arguments cross the bridge to the webview as JSON, so they're untyped here. */
+  moveTo: DOMImperativeFactory[string];
+}
 
 // OpenFreeMap needs no key. Its style carries the OpenFreeMap, OpenMapTiles
 // and OpenStreetMap credits, shown by the attribution control.
@@ -28,15 +35,44 @@ export default function WallMap({
   selected,
   onSelect,
   onViewChange,
+  panelOffset,
+  ref,
 }: {
   initialBounds: BBox;
   dots: MapDot[];
   selected: Uuid | null;
-  onSelect: (uuid: Uuid | null) => Promise<void>;
+  /** The tapped dot, as drawn, or null for a tap on the map. */
+  onSelect: (node: MapNode | null) => Promise<void>;
   onViewChange: (view: MapView) => Promise<void>;
+  /** Where a picked dot is moved to, in pixels from the middle of the map, so the panel it opens doesn't cover it. */
+  panelOffset: [number, number];
+  ref?: Ref<WallMapRef>;
   dom?: import('expo/dom').DOMProps;
 }) {
   const [cursor, setCursor] = useState('');
+  const mapRef = useRef<MapRef>(null);
+  // The handle below outlives renders, so it reads the offset from here.
+  const offset = useRef(panelOffset);
+  useEffect(() => {
+    offset.current = panelOffset;
+  });
+
+  /** Moves a picked dot into the middle of the map its panel leaves showing. */
+  const moveTo = (map: MapLibreMap, center: [number, number], zoom: number) => {
+    map.easeTo({ center, zoom, offset: offset.current });
+  };
+
+  useDOMImperativeHandle(
+    ref ?? null,
+    () => ({
+      moveTo(...args) {
+        const [lng, lat, zoom] = args as number[];
+        const map = mapRef.current?.getMap();
+        if (map) moveTo(map, [lng, lat], zoom);
+      },
+    }),
+    [],
+  );
 
   const reportView = ({ target: map }: MapLibreEvent) => {
     const b = map.getBounds();
@@ -46,6 +82,7 @@ export default function WallMap({
 
   return (
     <Map
+      ref={mapRef}
       initialViewState={{ bounds: initialBounds }}
       mapStyle={STYLE_URL}
       style={{ position: 'absolute', inset: 0 }}
@@ -58,16 +95,21 @@ export default function WallMap({
       onMoveEnd={reportView}
       onClick={(e) => {
         const feature = e.features?.[0];
-        onSelect((feature?.properties?.uuid as Uuid | undefined) ?? null);
-        // Tapping an area also zooms toward it, so it splits after a tap or two.
-        if (feature?.properties?.kind === 'area' && feature.geometry.type === 'Point') {
-          const [lng, lat] = feature.geometry.coordinates;
-          e.target.easeTo({ center: [lng, lat], zoom: e.target.getZoom() + 2 });
+        if (feature?.geometry.type !== 'Point') {
+          onSelect(null);
+          return;
         }
+        const [lng, lat] = feature.geometry.coordinates;
+        const { uuid, name, climbs, kind } = feature.properties as { uuid: Uuid; name: string; climbs: number; kind: string };
+        // Sent whole, since the screen's own dots may have moved on by the time this arrives.
+        onSelect({ uuid, name, totalClimbs: climbs, isLeaf: kind !== 'area', location: { lng, lat } });
+        // Tapping an area also zooms toward it, so it splits after a tap or two.
+        const zoom = e.target.getZoom();
+        moveTo(e.target, [lng, lat], kind === 'area' ? zoom + 2 : zoom);
       }}>
       <AttributionControl position="bottom-right" compact={false} />
-      {/* Phones pinch to zoom; buttons are for mouse users. */}
-      {process.env.EXPO_DOM_HOST_OS ? null : <NavigationControl position="top-left" showCompass={false} />}
+      {/* Phones pinch to zoom; buttons are for mouse users. Top right, clear of a picked dot's panel. */}
+      {process.env.EXPO_DOM_HOST_OS ? null : <NavigationControl position="top-right" showCompass={false} />}
       <Source id="dots" type="geojson" data={toGeoJson(dots, selected)}>
         {/* Invisible, larger circles so small dots are easy to tap. */}
         <Layer id="dot-hit" type="circle" paint={{ 'circle-radius': 22, 'circle-opacity': 0 }} />

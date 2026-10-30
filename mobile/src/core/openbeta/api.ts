@@ -103,6 +103,8 @@ const MAP_AREA_QUERY = `
 query MapArea($uuid: ID) {
   area(uuid: $uuid) {
     uuid
+    ancestors
+    pathTokens
     metadata { bbox }
     children { uuid area_name totalClimbs metadata { leaf lat lng } }
   }
@@ -110,6 +112,8 @@ query MapArea($uuid: ID) {
 
 interface ObMapArea {
   uuid: string;
+  ancestors: string[];
+  pathTokens: string[];
   metadata: { bbox: number[] | null } | null;
   children: {
     uuid: string;
@@ -138,6 +142,7 @@ export async function fetchMapArea(uuid: Uuid, signal?: AbortSignal): Promise<Ma
   const bbox = area.metadata?.bbox;
   return {
     uuid: area.uuid,
+    path: toCrumbs(area.ancestors, area.pathTokens).slice(0, -1), // ancestors include the area itself
     bbox: bbox?.length === 4 ? [bbox[0], bbox[1], bbox[2], bbox[3]] : null,
     children,
   };

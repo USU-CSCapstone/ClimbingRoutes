@@ -9,26 +9,29 @@ import { useTheme } from '@/hooks/use-theme';
 import { useHrefs } from '@/ui/nav';
 import { AppText } from '@/ui/text';
 
-/** A full-width tappable list row. */
+/** A full-width tappable list row that opens `href`, or runs `onPress` instead. */
 export function LinkRow({
   href,
+  onPress,
   leading,
   title,
   subtitle,
   trailing,
-}: {
-  href: Href;
+  accessibilityLabel,
+}: ({ href: Href; onPress?: never } | { onPress: () => void; href?: never }) & {
   leading?: ReactNode;
   title: string;
   subtitle?: string;
   trailing?: ReactNode;
+  accessibilityLabel?: string;
 }) {
   const theme = useTheme();
   return (
     // A plain Pressable rather than <Link asChild>: on web the link wrapper drops the row's layout.
     <Pressable
-      role="link"
-      onPress={() => router.push(href)}
+      role={href ? 'link' : 'button'}
+      accessibilityLabel={accessibilityLabel}
+      onPress={href ? () => router.push(href) : onPress}
       style={({ pressed }) => [
         styles.row,
         { borderBottomColor: theme.border },
@@ -86,8 +89,13 @@ const DISCIPLINE_LABELS: Record<Discipline, string> = {
   snow: 'Snow',
 };
 
+/** A count with its noun, like "1 wall" or "1,204 walls". */
+export function count(n: number, noun: string): string {
+  return `${n.toLocaleString()} ${noun}${n === 1 ? '' : 's'}`;
+}
+
 export function climbCount(n: number): string {
-  return n === 1 ? '1 route' : `${n.toLocaleString()} routes`;
+  return count(n, 'route');
 }
 
 export function disciplineText(disciplines: Discipline[]): string {
