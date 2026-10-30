@@ -4,38 +4,23 @@ import { useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Difficulty, SerifFont, Spacing, UngradedLine } from '@/constants/theme';
-import { difficultyBand } from '@/core/grades';
-import type { Grade, Uuid } from '@/core/types';
+import { SerifFont, Spacing } from '@/constants/theme';
+import type { Uuid } from '@/core/types';
 import type { PublishedModel } from '@/core/models';
-import { wallRoutes } from '@/core/walls';
-import { useRouteLines } from '@/data/models';
-import { useArea } from '@/data/queries';
-import { useTheme } from '@/hooks/use-theme';
 import { AppText } from '@/ui/text';
 import { ModelLayer, type ModelStatus, VIEWER_BACKGROUND } from '@/ui/wall/model-layer';
-import {
-  FactChips,
-  GlassButton,
-  GradeSpread,
-  OnModel,
-  placeName,
-  RoundButton,
-  RouteList,
-  wallFacts,
-} from '@/ui/wall/parts';
+import { FactChips, GlassButton, OnModel, RoundButton } from '@/ui/wall/parts';
 import { CARD_HEIGHT, RouteCard } from '@/ui/wall/route-card';
 import { RouteStrip, stripHeight } from '@/ui/wall/route-strip';
 import { RoutesSheet } from '@/ui/wall/routes-sheet';
-import type { ShownRoute, WallInfo } from '@/ui/wall/types';
+import type { WallInfo } from '@/ui/wall/types';
+import { useWallRoutes } from '@/ui/wall/use-wall-routes';
+import { PANEL_WIDTH, WallPanel, WIDE } from '@/ui/wall/wall-panel';
 import type { Insets, ViewerRoute } from '@/viewer/types';
 
-/** From this width the routes sit in a panel beside the model instead of along the bottom. */
-const WIDE = 900;
 const MARGIN = Spacing.three - Spacing.one;
 const TITLE_HEIGHT = 56;
 const BUTTON_HEIGHT = 36;
-const PANEL_WIDTH = 360;
 const EDGE = Spacing.three;
 
 /**
@@ -55,23 +40,15 @@ export function WallView({
   selected: Uuid | null;
   onSelect: (uuid: Uuid | null) => void;
 }) {
-  const theme = useTheme();
   const { width } = useWindowDimensions();
   const safe = useSafeAreaInsets();
   const wide = width >= WIDE;
-  const area = useArea(wall.uuid);
-  const saved = useRouteLines(model.id);
+  const { routes, linesKnown, facts, place, message: routesMessage, refetchLines } = useWallRoutes(wall.uuid, model.id);
   const [status, setStatus] = useState<ModelStatus>({ attempt: 0, percent: null, info: null, error: null });
   const [fps, setFps] = useState<number | null>(null);
   const [wholeWall, setWholeWall] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  // A copy saved on the device counts, so a wall that has loaded once works offline.
-  const linesKnown = saved.data !== undefined;
-  // Wait for OpenBeta's order so each route keeps its number.
-  const routes: ShownRoute[] = area.data
-    ? wallRoutes(area.data.climbs, saved.data ?? []).map((r) => ({ ...r, color: lineColor(r.grade) }))
-    : [];
   const lines: ViewerRoute[] = routes.flatMap((r) =>
     r.line
       ? [{ uuid: r.uuid, name: r.name, grade: r.grade, color: r.color, points: r.line.points, normals: r.line.normals }]
@@ -79,16 +56,7 @@ export function WallView({
   );
   const index = routes.findIndex((r) => r.uuid === selected);
   const selectedRoute = routes[index] ?? null;
-  const facts = wallFacts(routes, linesKnown);
-  const place = placeName(area.data);
   const notice = selectedRoute && !selectedRoute.line && linesKnown ? `${selectedRoute.name} isn't drawn yet` : null;
-  const routesMessage = area.isPending
-    ? 'Loading routes…'
-    : area.error
-      ? `Couldn't load the routes: ${area.error.message}`
-      : routes.length === 0
-        ? 'OpenBeta lists no routes on this wall'
-        : null;
 
   const insets: Insets = wide
     ? { top: 0, right: 0, bottom: selectedRoute ? CARD_HEIGHT + 2 * EDGE : 0, left: PANEL_WIDTH + 2 * EDGE }
@@ -111,7 +79,7 @@ export function WallView({
 
   function retry() {
     setStatus((s) => ({ attempt: s.attempt + 1, percent: null, info: null, error: null }));
-    saved.refetch();
+    refetchLines();
   }
 
   const devStats =
@@ -153,31 +121,18 @@ export function WallView({
 
       {wide ? (
         <>
-          <View style={[styles.panel, { backgroundColor: theme.background }]}>
-            <RouteList
-              routes={routes}
-              selected={selectedRoute?.uuid ?? null}
-              onPress={toggle}
-              linesKnown={linesKnown}
-              header={
-                <View style={styles.panelHeader}>
-                  <View style={styles.panelBack}>
-                    <RoundButton icon="chevron-back" label="Back" onPress={back} size={34} />
-                    <AppText type="small" color="textSecondary" numberOfLines={1} style={styles.flex}>
-                      {place ?? ''}
-                    </AppText>
-                  </View>
-                  <AppText style={[styles.panelTitle, { fontFamily: SerifFont }]}>{wall.name}</AppText>
-                  <FactChips facts={facts} />
-                  <GradeSpread routes={routes} />
-                  <AppText type="label" color="textSecondary" style={styles.listLabel}>
-                    {routesMessage ?? 'Routes, left to right'}
-                  </AppText>
-                </View>
-              }
-              contentContainerStyle={styles.panelList}
-            />
-          </View>
+          <WallPanel
+            wall={wall}
+            place={place}
+            facts={facts}
+            routes={routes}
+            message={routesMessage}
+            selected={selectedRoute?.uuid ?? null}
+            linesKnown={linesKnown}
+            onPress={toggle}
+            onBack={back}
+            style={styles.panel}
+          />
           <View style={styles.wideTools}>
             {devStats}
             <GlassButton icon="scan-outline" label="Whole wall" onPress={showWholeWall} />
@@ -261,12 +216,6 @@ export function WallView({
   );
 }
 
-/** Lines are drawn in their difficulty's color, or white when the grade has no band. */
-function lineColor(grade: Grade | null): string {
-  const band = difficultyBand(grade);
-  return band == null ? UngradedLine : Difficulty[band].line;
-}
-
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: VIEWER_BACKGROUND },
   flex: { flex: 1 },
@@ -294,21 +243,7 @@ const styles = StyleSheet.create({
   phoneTop: { position: 'absolute', flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
   phoneBottom: { position: 'absolute', left: 0, right: 0, gap: Spacing.two },
   buttonRow: { height: BUTTON_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  panel: {
-    position: 'absolute',
-    top: EDGE,
-    left: EDGE,
-    bottom: EDGE,
-    width: PANEL_WIDTH,
-    borderRadius: 20,
-    overflow: 'hidden',
-    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.3)',
-  },
-  panelHeader: { padding: Spacing.three, gap: Spacing.three },
-  panelBack: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  panelTitle: { fontSize: 32, lineHeight: 38, marginTop: -Spacing.two },
-  panelList: { paddingBottom: Spacing.four },
-  listLabel: { marginTop: Spacing.one },
+  panel: { position: 'absolute', top: EDGE, left: EDGE, bottom: EDGE, width: PANEL_WIDTH },
   wideTools: { position: 'absolute', top: EDGE, right: EDGE, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   wideNotice: { position: 'absolute', right: EDGE, maxWidth: PANEL_WIDTH },
   wideCard: { position: 'absolute', right: EDGE, bottom: EDGE, width: PANEL_WIDTH },

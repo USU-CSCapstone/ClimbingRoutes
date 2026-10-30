@@ -34,8 +34,8 @@ export function useHasModel(wallUuid: Uuid | undefined): boolean {
   return wallUuid != null && (data?.has(wallUuid) ?? false);
 }
 
-/** The wall's newest published model, or null if it has none. */
-export function useLatestModel(wallUuid: Uuid) {
+/** The wall's newest published model, or null if it has none. Not asked for while `enabled` is false. */
+export function useLatestModel(wallUuid: Uuid, enabled = true) {
   return useQuery({
     ...deviceCached(['latest-model', wallUuid], async ({ signal }): Promise<PublishedModel | null> => {
       const { data, error } = await supabase
@@ -50,6 +50,7 @@ export function useLatestModel(wallUuid: Uuid) {
       if (error) throw new Error(`Couldn't look up the wall's 3D model: ${error.message}`);
       return data && { id: data.id, wallUuid: data.wall_uuid, version: data.version, glbPath: data.glb_path, bytes: data.bytes };
     }),
+    enabled,
     staleTime: MODELS_STALE_MS,
   });
 }

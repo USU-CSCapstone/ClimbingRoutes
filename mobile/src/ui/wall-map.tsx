@@ -28,12 +28,15 @@ export default function WallMap({
   selected,
   onSelect,
   onViewChange,
+  wallOffset,
 }: {
   initialBounds: BBox;
   dots: MapDot[];
   selected: Uuid | null;
   onSelect: (uuid: Uuid | null) => Promise<void>;
   onViewChange: (view: MapView) => Promise<void>;
+  /** Where a tapped wall is moved to, in pixels from the middle of the map, so the wall's panel doesn't cover it. */
+  wallOffset: [number, number];
   dom?: import('expo/dom').DOMProps;
 }) {
   const [cursor, setCursor] = useState('');
@@ -59,15 +62,16 @@ export default function WallMap({
       onClick={(e) => {
         const feature = e.features?.[0];
         onSelect((feature?.properties?.uuid as Uuid | undefined) ?? null);
-        // Tapping an area also zooms toward it, so it splits after a tap or two.
-        if (feature?.properties?.kind === 'area' && feature.geometry.type === 'Point') {
-          const [lng, lat] = feature.geometry.coordinates;
-          e.target.easeTo({ center: [lng, lat], zoom: e.target.getZoom() + 2 });
-        }
+        if (feature?.geometry.type !== 'Point') return;
+        const [lng, lat] = feature.geometry.coordinates;
+        // Tapping an area also zooms toward it, so it splits after a tap or two. A wall moves into the
+        // middle of the map that its panel leaves showing.
+        if (feature.properties?.kind === 'area') e.target.easeTo({ center: [lng, lat], zoom: e.target.getZoom() + 2 });
+        else e.target.easeTo({ center: [lng, lat], offset: wallOffset });
       }}>
       <AttributionControl position="bottom-right" compact={false} />
-      {/* Phones pinch to zoom; buttons are for mouse users. */}
-      {process.env.EXPO_DOM_HOST_OS ? null : <NavigationControl position="top-left" showCompass={false} />}
+      {/* Phones pinch to zoom; buttons are for mouse users. Top right, clear of a picked wall's panel. */}
+      {process.env.EXPO_DOM_HOST_OS ? null : <NavigationControl position="top-right" showCompass={false} />}
       <Source id="dots" type="geojson" data={toGeoJson(dots, selected)}>
         {/* Invisible, larger circles so small dots are easy to tap. */}
         <Layer id="dot-hit" type="circle" paint={{ 'circle-radius': 22, 'circle-opacity': 0 }} />
