@@ -2,47 +2,56 @@ import { router } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, type StyleProp, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import type { MapView } from '@/core/map';
-import type { BBox, Uuid } from '@/core/types';
-import { useLatestModel } from '@/data/models';
-import { type MapDot, useMapDots } from '@/data/queries';
-import { useTheme } from '@/hooks/use-theme';
-import { climbCount, LinkRow, Message, WallLink } from '@/ui/components';
+import type { BBox, MapNode } from '@/core/types';
+import { useHasModel, useLatestModel, usePublishedWalls } from '@/data/models';
+import { type MapDot, useArea, useMapArea, useMapDots } from '@/data/queries';
+import { AreaPanel } from '@/ui/area-panel';
+import { Message, WallLink } from '@/ui/components';
 import { DOM_WEBVIEW } from '@/ui/dom';
 import { useHrefs } from '@/ui/nav';
-import WallMap from '@/ui/wall-map';
+import { PANEL_WIDTH, WIDE } from '@/ui/side-panel';
+import WallMap, { type MapFocus } from '@/ui/wall-map';
+import { placeName } from '@/ui/wall/parts';
 import { useWallRoutes } from '@/ui/wall/use-wall-routes';
-import { PANEL_WIDTH, WallPanel, WIDE } from '@/ui/wall/wall-panel';
+import { WallPanel } from '@/ui/wall/wall-panel';
 
 /** The lower 48 states. */
 const USA_BOUNDS: BBox = [-125, 24, -66, 50];
 /** Room for the map credits along the bottom edge. */
 const ATTRIBUTION_HEIGHT = 32;
 const EDGE = Spacing.three;
-/** On a phone, a wall's panel sits above the credits and fills about the bottom half of the map. */
+/** On a phone, a panel sits above the credits and fills about the bottom half of the map. */
 const PHONE_BOTTOM = ATTRIBUTION_HEIGHT + Spacing.two;
 const PHONE_SHARE = 0.5;
 const NATIVE_DRIVER = Platform.OS !== 'web';
 
+/** The picked dot, and whether the map has shown it since, as a dot or split into its children. */
+interface Selection {
+  node: MapNode;
+  seen: boolean;
+}
+
 export default function MapScreen() {
   // Replaced by the real view as soon as the map loads.
   const [view, setView] = useState<MapView>({ bbox: USA_BOUNDS, zoom: 3, width: 1, height: 1 });
-  const [selected, setSelected] = useState<Uuid | null>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [focus, setFocus] = useState<MapFocus | null>(null);
   const [mapHeight, setMapHeight] = useState(0);
-  const { dots, error } = useMapDots(view);
+  const { dots, split, error } = useMapDots(view);
   const { width } = useWindowDimensions();
-  const hrefs = useHrefs();
-  const theme = useTheme();
 
-  // Zooming out or panning away can fold the selected dot into its area. That closes its details for good,
-  // rather than reopening them when the dot comes back.
-  const dot = dots.find((d) => d.uuid === selected);
-  if (selected && !dot) setSelected(null);
-  const wall = dot?.isLeaf ? dot : null;
-  // The last wall picked stays in its panel while the panel slides away.
-  const [shownWall, setShownWall] = useState<MapDot | null>(null);
-  if (wall && (wall.uuid !== shownWall?.uuid || wall.hasModel !== shownWall.hasModel)) setShownWall(wall);
+  // Zooming out or panning away can fold the picked dot into its parent. That closes its panel for good,
+  // rather than reopening it when the dot comes back. A dot picked from a list may not have loaded yet,
+  // so it only counts once the map has shown it.
+  const selected = selection?.node ?? null;
+  const onMap = selected != null && (dots.some((d) => d.uuid === selected.uuid) || split.includes(selected.uuid));
+  if (selection && onMap && !selection.seen) setSelection({ ...selection, seen: true });
+  if (selection?.seen && !onMap) setSelection(null);
+  // The last dot picked stays in its panel while the panel slides away.
+  const [shown, setShown] = useState<MapNode | null>(null);
+  if (selected && selected !== shown) setShown(selected);
 
   if (error) return <Message title="Couldn't load the map" detail={error.message} />;
 
@@ -50,48 +59,56 @@ export default function MapScreen() {
   const phoneHeight = Math.round(mapHeight * PHONE_SHARE);
   // How far the panel reaches in from its edge, margins included.
   const covered = wide ? PANEL_WIDTH + 2 * EDGE : phoneHeight + PHONE_BOTTOM;
-  const details = [climbCount(dot?.totalClimbs ?? 0), dot?.hasModel ? '3D model' : null];
+  const close = () => setSelection(null);
+  /** A wall or area picked from a panel's list: opens its panel and moves the map to it. */
+  const pick = (node: MapNode) => {
+    setSelection({ node, seen: false });
+    setFocus((f) => ({ location: node.location, isLeaf: node.isLeaf, seq: (f?.seq ?? 0) + 1 }));
+  };
 
   return (
     <View style={styles.screen} onLayout={(e) => setMapHeight(e.nativeEvent.layout.height)}>
       <WallMap
         initialBounds={USA_BOUNDS}
         dots={dots}
-        selected={selected}
-        onSelect={async (uuid) => setSelected(uuid)}
+        selected={selected?.uuid ?? null}
+        onSelect={async (uuid) => {
+          const dot = dots.find((d) => d.uuid === uuid);
+          setSelection(dot ? { node: dot, seen: true } : null);
+        }}
         onViewChange={async (v) => setView(v)}
-        wallOffset={wide ? [covered / 2, 0] : [0, -covered / 2]}
+        panelOffset={wide ? [covered / 2, 0] : [0, -covered / 2]}
+        focus={focus}
         dom={{ ...DOM_WEBVIEW, style: styles.screen, scrollEnabled: false, bounces: false }}
       />
-      {/* A wall opens its routes, as on its 3D page. */}
-      {shownWall ? (
+      {/* A wall opens its routes, as on its 3D page; an area opens its walls and sub-areas. */}
+      {shown ? (
         <SlideIn
-          open={wall != null}
+          open={selected != null}
           from={wide ? 'left' : 'bottom'}
           distance={covered}
-          onClosed={() => setShownWall(null)}
+          onClosed={() => setShown(null)}
           style={wide ? styles.widePanel : [styles.phonePanel, { height: phoneHeight }]}>
-          <WallDetails key={shownWall.uuid} dot={shownWall} compact={!wide} onBack={() => setSelected(null)} />
+          {shown.isLeaf ? (
+            <WallDetails key={shown.uuid} node={shown} compact={!wide} onBack={close} />
+          ) : (
+            <AreaDetails key={shown.uuid} node={shown} onPick={pick} onBack={close} />
+          )}
         </SlideIn>
-      ) : null}
-      {/* An area shows in a card at the bottom, within thumb reach, above the map credits. */}
-      {dot && !dot.isLeaf ? (
-        <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.border }]}>
-          <LinkRow href={hrefs.area(dot.uuid)} title={dot.name} subtitle={details.filter(Boolean).join(' · ')} />
-        </View>
       ) : null}
     </View>
   );
 }
 
 /** The picked wall's routes, with a way into its 3D model when it has one. */
-function WallDetails({ dot, compact, onBack }: { dot: MapDot; compact: boolean; onBack: () => void }) {
+function WallDetails({ node, compact, onBack }: { node: MapNode; compact: boolean; onBack: () => void }) {
   const hrefs = useHrefs();
-  const model = useLatestModel(dot.uuid, dot.hasModel);
-  const { routes, linesKnown, facts, place, message } = useWallRoutes(dot.uuid, model.data?.id);
+  const hasModel = useHasModel(node.uuid);
+  const model = useLatestModel(node.uuid, hasModel);
+  const { routes, linesKnown, facts, place, message } = useWallRoutes(node.uuid, model.data?.id);
   return (
     <WallPanel
-      wall={dot}
+      wall={node}
       place={place}
       facts={facts}
       routes={routes}
@@ -102,7 +119,45 @@ function WallDetails({ dot, compact, onBack }: { dot: MapDot; compact: boolean; 
       onBack={onBack}
       backLabel="Close"
       compact={compact}
-      footer={dot.hasModel ? <WallLink wallUuid={dot.uuid} label="View in 3D" /> : null}
+      footer={hasModel ? <WallLink wallUuid={node.uuid} label="View in 3D" /> : null}
+      style={styles.fill}
+    />
+  );
+}
+
+/** The picked area's walls and sub-areas, as the map draws them, by name. */
+function AreaDetails({
+  node,
+  onPick,
+  onBack,
+}: {
+  node: MapNode;
+  onPick: (node: MapNode) => void;
+  onBack: () => void;
+}) {
+  const children = useMapArea(node.uuid);
+  const area = useArea(node.uuid);
+  const published = usePublishedWalls().data;
+  const items: MapDot[] = (children.data?.children ?? [])
+    .map((c) => ({ ...c, hasModel: published?.has(c.uuid) ?? false }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const message = children.isPending
+    ? 'Loading…'
+    : children.error
+      ? `Couldn't load this area: ${children.error.message}`
+      : items.length === 0
+        ? 'OpenBeta has nothing here to show on the map'
+        : null;
+  return (
+    <AreaPanel
+      name={node.name}
+      place={placeName(area.data)}
+      totalClimbs={node.totalClimbs}
+      items={items}
+      message={message}
+      onPress={onPick}
+      onBack={onBack}
+      backLabel="Close"
       style={styles.fill}
     />
   );
@@ -149,17 +204,6 @@ function SlideIn({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   fill: { flex: 1 },
-  card: {
-    position: 'absolute',
-    left: Spacing.three,
-    right: Spacing.three,
-    bottom: ATTRIBUTION_HEIGHT + Spacing.two,
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
   // The credits are bottom right, so a panel down the left leaves them clear.
   widePanel: { position: 'absolute', top: EDGE, left: EDGE, bottom: EDGE, width: PANEL_WIDTH },
   phonePanel: { position: 'absolute', left: EDGE, right: EDGE, bottom: PHONE_BOTTOM },

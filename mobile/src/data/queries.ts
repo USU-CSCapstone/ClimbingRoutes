@@ -43,7 +43,7 @@ const MAP_FETCHES_AT_ONCE = 6;
 export function useMapDots(view: MapView) {
   const [areas, setAreas] = useState<Map<Uuid, MapArea>>(() => new Map());
   const [error, setError] = useState<Error | null>(null);
-  const { nodes, missing } = visibleNodes(ROOT_AREA.uuid, view, (uuid) => areas.get(uuid));
+  const { nodes, split, missing } = visibleNodes(ROOT_AREA.uuid, view, (uuid) => areas.get(uuid));
   // A few at a time so OpenBeta isn't flooded; the rest load as these finish.
   const missingKey = missing.slice(0, MAP_FETCHES_AT_ONCE).join(',');
 
@@ -65,7 +65,15 @@ export function useMapDots(view: MapView) {
 
   const published = usePublishedWalls().data;
   const dots: MapDot[] = nodes.map((n) => ({ ...n, hasModel: published?.has(n.uuid) ?? false }));
-  return { dots, loading: missing.length > 0, error };
+  return { dots, split, loading: missing.length > 0, error };
+}
+
+/** An area's children as the map draws them: those with a location and routes. Shares the map's cache. */
+export function useMapArea(uuid: Uuid) {
+  return useQuery({
+    queryKey: ['mapArea', uuid],
+    queryFn: ({ signal }) => fetchMapArea(uuid, signal),
+  });
 }
 
 export function useSearch(query: string) {

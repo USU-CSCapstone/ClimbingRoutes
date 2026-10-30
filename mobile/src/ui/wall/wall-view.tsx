@@ -14,8 +14,9 @@ import { CARD_HEIGHT, RouteCard } from '@/ui/wall/route-card';
 import { RouteStrip, stripHeight } from '@/ui/wall/route-strip';
 import { RoutesSheet } from '@/ui/wall/routes-sheet';
 import type { WallInfo } from '@/ui/wall/types';
+import { PANEL_WIDTH, WIDE } from '@/ui/side-panel';
 import { useWallRoutes } from '@/ui/wall/use-wall-routes';
-import { PANEL_WIDTH, WallPanel, WIDE } from '@/ui/wall/wall-panel';
+import { WallPanel } from '@/ui/wall/wall-panel';
 import type { Insets, ViewerRoute } from '@/viewer/types';
 
 const MARGIN = Spacing.three - Spacing.one;

@@ -2,14 +2,22 @@
 
 // A DOM component: MapLibre runs as-is on web and in a WebView on iOS and
 // Android, so the map works in Expo Go with no native build.
-import type { ExpressionSpecification, MapLibreEvent } from 'maplibre-gl';
+import type { ExpressionSpecification, MapLibreEvent, Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useState } from 'react';
-import { AttributionControl, Layer, Map, NavigationControl, Source } from 'react-map-gl/maplibre';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { AttributionControl, Layer, Map, type MapRef, NavigationControl, Source } from 'react-map-gl/maplibre';
 
-import type { MapView } from '@/core/map';
-import type { BBox, Uuid } from '@/core/types';
+import { ALWAYS_SPLIT_ZOOM, type MapView } from '@/core/map';
+import type { BBox, LatLng, Uuid } from '@/core/types';
 import type { MapDot } from '@/data/queries';
+
+/** A dot picked outside the map, such as from a panel's list, for the map to move to. */
+export interface MapFocus {
+  location: LatLng;
+  isLeaf: boolean;
+  /** Bumped for each pick, so picking the same dot again moves the map again. */
+  seq: number;
+}
 
 // OpenFreeMap needs no key. Its style carries the OpenFreeMap, OpenMapTiles
 // and OpenStreetMap credits, shown by the attribution control.
@@ -28,18 +36,41 @@ export default function WallMap({
   selected,
   onSelect,
   onViewChange,
-  wallOffset,
+  panelOffset,
+  focus,
 }: {
   initialBounds: BBox;
   dots: MapDot[];
   selected: Uuid | null;
   onSelect: (uuid: Uuid | null) => Promise<void>;
   onViewChange: (view: MapView) => Promise<void>;
-  /** Where a tapped wall is moved to, in pixels from the middle of the map, so the wall's panel doesn't cover it. */
-  wallOffset: [number, number];
+  /** Where a picked dot is moved to, in pixels from the middle of the map, so the panel it opens doesn't cover it. */
+  panelOffset: [number, number];
+  focus: MapFocus | null;
   dom?: import('expo/dom').DOMProps;
 }) {
   const [cursor, setCursor] = useState('');
+  const mapRef = useRef<MapRef>(null);
+
+  /**
+   * Moves a picked dot into the middle of the map its panel leaves showing.
+   * An area also zooms in, so it splits after a pick or two.
+   */
+  const moveTo = (map: MapLibreMap, center: [number, number], isArea: boolean, zoom = map.getZoom()) => {
+    map.easeTo({ center, zoom: isArea ? map.getZoom() + 2 : zoom, offset: panelOffset });
+  };
+
+  // A wall picked from a list may still be folded into its area, so zoom in until every area splits.
+  const focused = useEffectEvent(() => {
+    const map = mapRef.current?.getMap();
+    if (!map || !focus) return;
+    const { lng, lat } = focus.location;
+    moveTo(map, [lng, lat], !focus.isLeaf, Math.max(map.getZoom(), ALWAYS_SPLIT_ZOOM));
+  });
+  const focusSeq = focus?.seq;
+  useEffect(() => {
+    if (focusSeq != null) focused();
+  }, [focusSeq]);
 
   const reportView = ({ target: map }: MapLibreEvent) => {
     const b = map.getBounds();
@@ -49,6 +80,7 @@ export default function WallMap({
 
   return (
     <Map
+      ref={mapRef}
       initialViewState={{ bounds: initialBounds }}
       mapStyle={STYLE_URL}
       style={{ position: 'absolute', inset: 0 }}
@@ -64,13 +96,10 @@ export default function WallMap({
         onSelect((feature?.properties?.uuid as Uuid | undefined) ?? null);
         if (feature?.geometry.type !== 'Point') return;
         const [lng, lat] = feature.geometry.coordinates;
-        // Tapping an area also zooms toward it, so it splits after a tap or two. A wall moves into the
-        // middle of the map that its panel leaves showing.
-        if (feature.properties?.kind === 'area') e.target.easeTo({ center: [lng, lat], zoom: e.target.getZoom() + 2 });
-        else e.target.easeTo({ center: [lng, lat], offset: wallOffset });
+        moveTo(e.target, [lng, lat], feature.properties?.kind === 'area');
       }}>
       <AttributionControl position="bottom-right" compact={false} />
-      {/* Phones pinch to zoom; buttons are for mouse users. Top right, clear of a picked wall's panel. */}
+      {/* Phones pinch to zoom; buttons are for mouse users. Top right, clear of a picked dot's panel. */}
       {process.env.EXPO_DOM_HOST_OS ? null : <NavigationControl position="top-right" showCompass={false} />}
       <Source id="dots" type="geojson" data={toGeoJson(dots, selected)}>
         {/* Invisible, larger circles so small dots are easy to tap. */}

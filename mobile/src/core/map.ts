@@ -14,19 +14,20 @@ export interface MapView {
 /** Room each child dot needs, in pixels, before its area splits. */
 const DOT_ROOM = 60;
 /** At this zoom every area splits, even if its children share one point. */
-const ALWAYS_SPLIT_ZOOM = 14;
+export const ALWAYS_SPLIT_ZOOM = 14;
 
 /**
  * Walks down from `root`, splitting areas near the view. Returns the dots to
- * draw and the areas that must be loaded before they can be split, nearest
- * the middle of the view first.
+ * draw, the areas split into them, and the areas that must be loaded before
+ * they can be split, nearest the middle of the view first.
  */
 export function visibleNodes(
   root: Uuid,
   view: MapView,
   getArea: (uuid: Uuid) => MapArea | undefined,
-): { nodes: MapNode[]; missing: Uuid[] } {
+): { nodes: MapNode[]; split: Uuid[]; missing: Uuid[] } {
   const nodes: MapNode[] = [];
+  const split: Uuid[] = [];
   const missing: MapNode[] = [];
   // Look half a view beyond each edge, so areas centered just off screen
   // still split when their children reach into it.
@@ -54,6 +55,7 @@ export function visibleNodes(
       nodes.push(node);
       return;
     }
+    split.push(node.uuid);
     walkAll(area.children);
   };
 
@@ -66,10 +68,10 @@ export function visibleNodes(
   };
 
   const top = getArea(root);
-  if (!top) return { nodes, missing: [root] };
+  if (!top) return { nodes, split, missing: [root] };
   walkAll(top.children);
   missing.sort((a, b) => distance(a) - distance(b));
-  return { nodes, missing: missing.map((n) => n.uuid) };
+  return { nodes, split, missing: missing.map((n) => n.uuid) };
 }
 
 /** Splits once the children spread far enough on screen that they'd rarely overlap. */
