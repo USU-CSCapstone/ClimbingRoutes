@@ -14,7 +14,10 @@ import type { MapDot } from '@/data/queries';
 
 /** Moves the map from outside it, such as when a panel's list picks a dot. */
 export interface WallMapRef extends DOMImperativeFactory {
-  /** Takes lng, lat and zoom. Arguments cross the bridge to the webview as JSON, so they're untyped here. */
+  /**
+   * Takes lng, lat, zoom and whether the dot is a wall. Arguments cross the bridge to the webview as JSON,
+   * so they're untyped here.
+   */
   moveTo: DOMImperativeFactory[string];
 }
 
@@ -35,7 +38,7 @@ export default function WallMap({
   selected,
   onSelect,
   onViewChange,
-  panelOffset,
+  panelOffsets,
   ref,
 }: {
   initialBounds: BBox;
@@ -44,31 +47,34 @@ export default function WallMap({
   /** The tapped dot, as drawn, or null for a tap on the map. */
   onSelect: (node: MapNode | null) => Promise<void>;
   onViewChange: (view: MapView) => Promise<void>;
-  /** Where a picked dot is moved to, in pixels from the middle of the map, so the panel it opens doesn't cover it. */
-  panelOffset: [number, number];
+  /**
+   * Where a picked wall or area is moved to, in pixels from the middle of the map, so the panel it opens
+   * doesn't cover it.
+   */
+  panelOffsets: { wall: [number, number]; area: [number, number] };
   ref?: Ref<WallMapRef>;
   dom?: import('expo/dom').DOMProps;
 }) {
   const [cursor, setCursor] = useState('');
   const mapRef = useRef<MapRef>(null);
-  // The handle below outlives renders, so it reads the offset from here.
-  const offset = useRef(panelOffset);
+  // The handle below outlives renders, so it reads the offsets from here.
+  const offsets = useRef(panelOffsets);
   useEffect(() => {
-    offset.current = panelOffset;
+    offsets.current = panelOffsets;
   });
 
   /** Moves a picked dot into the middle of the map its panel leaves showing. */
-  const moveTo = (map: MapLibreMap, center: [number, number], zoom: number) => {
-    map.easeTo({ center, zoom, offset: offset.current });
+  const moveTo = (map: MapLibreMap, center: [number, number], zoom: number, wall: boolean) => {
+    map.easeTo({ center, zoom, offset: wall ? offsets.current.wall : offsets.current.area });
   };
 
   useDOMImperativeHandle(
     ref ?? null,
     () => ({
       moveTo(...args) {
-        const [lng, lat, zoom] = args as number[];
+        const [lng, lat, zoom, wall] = args as [number, number, number, boolean];
         const map = mapRef.current?.getMap();
-        if (map) moveTo(map, [lng, lat], zoom);
+        if (map) moveTo(map, [lng, lat], zoom, wall);
       },
     }),
     [],
@@ -85,7 +91,8 @@ export default function WallMap({
       ref={mapRef}
       initialViewState={{ bounds: initialBounds }}
       mapStyle={STYLE_URL}
-      style={{ position: 'absolute', inset: 0 }}
+      // Isolated so MapLibre's controls, which set their own z-index, stay under panels drawn over the map on web.
+      style={{ position: 'absolute', inset: 0, isolation: 'isolate' }}
       attributionControl={false}
       cursor={cursor}
       interactiveLayerIds={['dot-hit']}
@@ -105,7 +112,7 @@ export default function WallMap({
         onSelect({ uuid, name, totalClimbs: climbs, isLeaf: kind !== 'area', location: { lng, lat } });
         // Tapping an area also zooms toward it, so it splits after a tap or two.
         const zoom = e.target.getZoom();
-        moveTo(e.target, [lng, lat], kind === 'area' ? zoom + 2 : zoom);
+        moveTo(e.target, [lng, lat], kind === 'area' ? zoom + 2 : zoom, kind !== 'area');
       }}>
       <AttributionControl position="bottom-right" compact={false} />
       {/* Phones pinch to zoom; buttons are for mouse users. Top right, clear of a picked dot's panel. */}

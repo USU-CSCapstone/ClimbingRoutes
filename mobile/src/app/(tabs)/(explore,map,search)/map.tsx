@@ -4,7 +4,7 @@ import { Animated, Platform, type StyleProp, StyleSheet, useWindowDimensions, Vi
 
 import { Spacing } from '@/constants/theme';
 import { type MapView, splitZoom } from '@/core/map';
-import type { BBox, MapArea, MapNode } from '@/core/types';
+import type { BBox, MapArea, MapNode, Uuid } from '@/core/types';
 import { useHasModel, useLatestModel } from '@/data/models';
 import { useMapArea, useMapDots } from '@/data/queries';
 import { AreaPanel } from '@/ui/area-panel';
@@ -14,7 +14,9 @@ import { useHrefs } from '@/ui/nav';
 import { PANEL_WIDTH, WIDE } from '@/ui/side-panel';
 import WallMap, { type WallMapRef } from '@/ui/wall-map';
 import { placeName } from '@/ui/wall/parts';
+import { RoutesSheet } from '@/ui/wall/routes-sheet';
 import { useWallRoutes } from '@/ui/wall/use-wall-routes';
+import { WallBar, wallBarHeight } from '@/ui/wall/wall-bar';
 import { WallPanel } from '@/ui/wall/wall-panel';
 
 /** The lower 48 states. */
@@ -22,9 +24,11 @@ const USA_BOUNDS: BBox = [-125, 24, -66, 50];
 /** Room for the map credits along the bottom edge. */
 const ATTRIBUTION_HEIGHT = 32;
 const EDGE = Spacing.three;
-/** On a phone, a panel sits above the credits and fills about the bottom half of the map. */
+/** On a phone, panels sit above the credits, and an area's fills about the bottom half of the map. */
 const PHONE_BOTTOM = ATTRIBUTION_HEIGHT + Spacing.two;
 const PHONE_SHARE = 0.5;
+/** A wall's full route list, opened from its bar on a phone, rises over most of the map. */
+const SHEET_SHARE = 0.85;
 const NATIVE_DRIVER = Platform.OS !== 'web';
 
 /** The picked dot, and whether the map has shown it since, as a dot or split into its children. */
@@ -57,8 +61,12 @@ export default function MapScreen() {
 
   const wide = width >= WIDE;
   const phoneHeight = Math.round(mapHeight * PHONE_SHARE);
-  // How far the panel reaches in from its edge, margins included.
-  const covered = wide ? PANEL_WIDTH + 2 * EDGE : phoneHeight + PHONE_BOTTOM;
+  // How far a panel reaches in from its edge, margins included. On a phone a wall needs only a bar of
+  // route pills, which grows when they open into cards.
+  const side = PANEL_WIDTH + 2 * EDGE;
+  const wallCovers = (cards: boolean) => (wide ? side : wallBarHeight(cards) + PHONE_BOTTOM);
+  const areaCovers = wide ? side : phoneHeight + PHONE_BOTTOM;
+  const offset = (covered: number): [number, number] => (wide ? [covered / 2, 0] : [0, -covered / 2]);
   const close = () => setSelection(null);
   /**
    * A wall or area picked from `parent`'s list: opens its panel and moves the map to it, zoomed in at
@@ -67,7 +75,7 @@ export default function MapScreen() {
   const pick = (node: MapNode, parent: MapArea) => {
     setSelection({ node, seen: false });
     const zoom = Math.max(node.isLeaf ? view.zoom : view.zoom + 2, splitZoom(parent, view));
-    mapRef.current?.moveTo(node.location.lng, node.location.lat, zoom);
+    mapRef.current?.moveTo(node.location.lng, node.location.lat, zoom, node.isLeaf);
   };
 
   return (
@@ -79,7 +87,7 @@ export default function MapScreen() {
         selected={selected?.uuid ?? null}
         onSelect={async (node) => setSelection(node && { node, seen: false })}
         onViewChange={async (v) => setView(v)}
-        panelOffset={wide ? [covered / 2, 0] : [0, -covered / 2]}
+        panelOffsets={{ wall: offset(wallCovers(false)), area: offset(areaCovers) }}
         dom={{ ...DOM_WEBVIEW, style: styles.screen, scrollEnabled: false, bounces: false }}
       />
       {/* A wall opens its routes, as on its 3D page; an area opens its walls and sub-areas. */}
@@ -87,11 +95,19 @@ export default function MapScreen() {
         <SlideIn
           open={selected != null}
           from={wide ? 'left' : 'bottom'}
-          distance={covered}
+          distance={shown.isLeaf ? wallCovers(true) : areaCovers}
           onClosed={() => setShown(null)}
-          style={wide ? styles.widePanel : [styles.phonePanel, { height: phoneHeight }]}>
+          style={
+            wide ? styles.widePanel : shown.isLeaf ? styles.phoneWall : [styles.phonePanel, { height: phoneHeight }]
+          }>
           {shown.isLeaf ? (
-            <WallDetails key={shown.uuid} node={shown} compact={!wide} onBack={close} />
+            <WallDetails
+              key={shown.uuid}
+              node={shown}
+              wide={wide}
+              sheetHeight={Math.round(mapHeight * SHEET_SHARE)}
+              onBack={close}
+            />
           ) : (
             <AreaDetails key={shown.uuid} node={shown} onPick={pick} onBack={close} />
           )}
@@ -101,28 +117,88 @@ export default function MapScreen() {
   );
 }
 
-/** The picked wall's routes, with a way into its 3D model when it has one. */
-function WallDetails({ node, compact, onBack }: { node: MapNode; compact: boolean; onBack: () => void }) {
+/**
+ * The picked wall's routes, with a way into its 3D model when it has one: in a panel on a wide screen,
+ * and on a phone in a bar of route pills that open into cards, as on its 3D page.
+ */
+function WallDetails({
+  node,
+  wide,
+  sheetHeight,
+  onBack,
+}: {
+  node: MapNode;
+  wide: boolean;
+  /** How tall the phone's full route list is. */
+  sheetHeight: number;
+  onBack: () => void;
+}) {
   const hrefs = useHrefs();
   const hasModel = useHasModel(node.uuid);
   const model = useLatestModel(node.uuid, hasModel);
   const { routes, linesKnown, facts, place, message } = useWallRoutes(node.uuid, model.data?.id);
+  const [selected, setSelected] = useState<Uuid | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const openRoute = (uuid: Uuid) => router.push(hrefs.climb(uuid));
+
+  if (wide) {
+    return (
+      <WallPanel
+        wall={node}
+        place={place}
+        facts={facts}
+        routes={routes}
+        message={message}
+        selected={null}
+        linesKnown={linesKnown}
+        onPress={openRoute}
+        onBack={onBack}
+        backLabel="Close"
+        footer={hasModel ? <WallLink wallUuid={node.uuid} label="View in 3D" /> : null}
+        style={styles.fill}
+      />
+    );
+  }
   return (
-    <WallPanel
-      wall={node}
-      place={place}
-      facts={facts}
-      routes={routes}
-      message={message}
-      selected={null}
-      linesKnown={linesKnown}
-      onPress={(uuid) => router.push(hrefs.climb(uuid))}
-      onBack={onBack}
-      backLabel="Close"
-      compact={compact}
-      footer={hasModel ? <WallLink wallUuid={node.uuid} label="View in 3D" /> : null}
-      style={styles.fill}
-    />
+    <>
+      <WallBar
+        wall={node}
+        place={place}
+        routes={routes}
+        index={routes.findIndex((r) => r.uuid === selected)}
+        linesKnown={linesKnown}
+        message={message}
+        onSelect={setSelected}
+        onOpen={openRoute}
+        onAllRoutes={() => setSheetOpen(true)}
+        onClose={onBack}
+        trailing={
+          hasModel ? (
+            <WallLink
+              wallUuid={node.uuid}
+              route={selected ?? undefined}
+              label="3D"
+              accessibilityLabel="View in 3D"
+              compact
+            />
+          ) : null
+        }
+        style={styles.wallBar}
+      />
+      {sheetOpen ? (
+        <RoutesSheet
+          wall={node}
+          place={place}
+          facts={facts}
+          routes={routes}
+          selected={selected}
+          linesKnown={linesKnown}
+          onSelect={setSelected}
+          onClose={() => setSheetOpen(false)}
+          height={sheetHeight}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -203,4 +279,7 @@ const styles = StyleSheet.create({
   // The credits are bottom right, so a panel down the left leaves them clear.
   widePanel: { position: 'absolute', top: EDGE, left: EDGE, bottom: EDGE, width: PANEL_WIDTH },
   phonePanel: { position: 'absolute', left: EDGE, right: EDGE, bottom: PHONE_BOTTOM },
+  // A wall's bar and its full route list are placed within the map, and taps around them reach it.
+  phoneWall: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'box-none' },
+  wallBar: { position: 'absolute', left: 0, right: 0, bottom: PHONE_BOTTOM },
 });

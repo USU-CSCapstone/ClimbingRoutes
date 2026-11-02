@@ -1,4 +1,5 @@
-import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -19,6 +20,7 @@ export function RouteCard({
   onPrevious,
   onNext,
   onClose,
+  onOpen,
   style,
 }: {
   route: ShownRoute;
@@ -29,6 +31,8 @@ export function RouteCard({
   onPrevious: () => void;
   onNext: () => void;
   onClose: () => void;
+  /** Adds a link to the route's page, for cards away from its 3D wall. */
+  onOpen?: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
@@ -53,6 +57,19 @@ export function RouteCard({
         <AppText type="small" color="textSecondary" numberOfLines={1} style={styles.position}>
           {[`${index + 1} of ${total}`, status].filter(Boolean).join(' · ')}
         </AppText>
+        {onOpen ? (
+          <Pressable
+            role="link"
+            accessibilityLabel={`${route.name} details`}
+            onPress={onOpen}
+            hitSlop={6}
+            style={({ pressed }) => [styles.open, { borderColor: theme.border }, pressed && styles.pressed]}>
+            <AppText type="small" style={styles.openText}>
+              Details
+            </AppText>
+            <Ionicons name="chevron-forward" size={16} color={theme.text} />
+          </Pressable>
+        ) : null}
         <RoundButton
           icon="chevron-back"
           label="Route to the left"
@@ -97,6 +114,18 @@ const styles = StyleSheet.create({
   },
   top: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + Spacing.half },
   name: { flex: 1 },
+  open: {
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingLeft: Spacing.three,
+    paddingRight: Spacing.two + Spacing.half,
+    borderRadius: 19,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  openText: { fontWeight: '600' },
+  pressed: { opacity: 0.7 },
   stats: { flexDirection: 'row', gap: Spacing.four },
   stat: { flexShrink: 0 },
   statGrow: { flex: 1, minWidth: 0 },

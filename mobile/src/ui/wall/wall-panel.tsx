@@ -8,8 +8,8 @@ import type { ShownRoute, WallInfo } from '@/ui/wall/types';
 
 /**
  * A wall's name, facts, grade spread and routes, left to right: beside the
- * model on the 3D page, and over the map when a wall is picked. The caller
- * places it.
+ * model on the 3D page, and over the map when a wall is picked on a wide
+ * screen. The caller places it.
  */
 export function WallPanel({
   wall,
@@ -22,7 +22,6 @@ export function WallPanel({
   onPress,
   onBack,
   backLabel,
-  compact,
   footer,
   style,
 }: {
@@ -37,8 +36,6 @@ export function WallPanel({
   onPress: (uuid: Uuid) => void;
   onBack: () => void;
   backLabel?: string;
-  /** Leaves out the grade spread and the list's label, so a short panel still shows some routes. */
-  compact?: boolean;
   /** Pinned below the list. */
   footer?: ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -53,8 +50,8 @@ export function WallPanel({
         header={
           <PanelHeader place={place} title={wall.name} onBack={onBack} backLabel={backLabel}>
             <FactChips facts={facts} />
-            {compact ? null : <GradeSpread routes={routes} />}
-            {compact && !message ? null : <PanelLabel>{message ?? 'Routes, left to right'}</PanelLabel>}
+            <GradeSpread routes={routes} />
+            <PanelLabel>{message ?? 'Routes, left to right'}</PanelLabel>
           </PanelHeader>
         }
         contentContainerStyle={panelListStyle}

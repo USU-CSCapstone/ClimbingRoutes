@@ -123,15 +123,34 @@ export function Breadcrumb({ path }: { path: Crumb[] }) {
 }
 
 /** Opens a wall's 3D model, with one of its routes selected if given. */
-export function WallLink({ wallUuid, route, label }: { wallUuid: Uuid; route?: Uuid; label: string }) {
+export function WallLink({
+  wallUuid,
+  route,
+  label,
+  accessibilityLabel,
+  compact,
+}: {
+  wallUuid: Uuid;
+  route?: Uuid;
+  label: string;
+  accessibilityLabel?: string;
+  /** A small pill for a bar, rather than a full-width button. */
+  compact?: boolean;
+}) {
   const theme = useTheme();
   const href = (route ? `/walls/${wallUuid}?route=${route}` : `/walls/${wallUuid}`) as Href;
   return (
     <Pressable
       role="link"
+      accessibilityLabel={accessibilityLabel}
       onPress={() => router.push(href)}
-      style={({ pressed }) => [styles.wallLink, { backgroundColor: theme.accent }, pressed && styles.pressed]}>
-      <Ionicons name="cube-outline" size={22} color={theme.accentText} />
+      style={({ pressed }) => [
+        styles.wallLink,
+        compact && styles.wallLinkCompact,
+        { backgroundColor: theme.accent },
+        pressed && styles.pressed,
+      ]}>
+      <Ionicons name="cube-outline" size={compact ? 18 : 22} color={theme.accentText} />
       <AppText style={[styles.wallLinkText, { color: theme.accentText }]}>{label}</AppText>
     </Pressable>
   );
@@ -212,6 +231,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     borderRadius: 12,
   },
+  wallLinkCompact: { minHeight: 40, paddingHorizontal: Spacing.three, borderRadius: 20 },
   wallLinkText: { fontWeight: '700' },
   pressed: { opacity: 0.8 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, gap: Spacing.two },
