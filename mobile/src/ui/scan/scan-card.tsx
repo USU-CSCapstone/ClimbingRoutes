@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { type Href, router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { Spacing, TapTarget } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import type { AreaSummary, Uuid } from '@/core/types';
 import { usePublishedWalls } from '@/data/models';
 import { useTheme } from '@/hooks/use-theme';
+import { ActionButton, scanHref } from '@/ui/scan/controls';
 import { AppText } from '@/ui/text';
 
 /** A scan started on this wall and not uploaded yet. Filled in from the scan storage in #44. */
@@ -28,7 +29,7 @@ export function useNeedsScan(area: Pick<AreaSummary, 'uuid' | 'isLeaf' | 'isBoul
 export function ScanCard({ wallUuid, unfinished }: { wallUuid: Uuid; unfinished?: UnfinishedScan | null }) {
   const theme = useTheme();
   const scan = (scanId?: string) =>
-    router.push((scanId ? `/scan/${wallUuid}?scan=${scanId}` : `/scan/${wallUuid}`) as Href);
+    router.push(scanId ? (`/scan/${wallUuid}?scan=${scanId}` as Href) : scanHref(wallUuid));
 
   return (
     <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
@@ -43,55 +44,17 @@ export function ScanCard({ wallUuid, unfinished }: { wallUuid: Uuid; unfinished?
       </AppText>
       {unfinished ? (
         <>
-          <Button icon="play" label="Resume scan" onPress={() => scan(unfinished.id)} primary />
-          <Button icon="add" label="Start a new scan" onPress={() => scan()} />
+          <ActionButton icon="play" label="Resume scan" onPress={() => scan(unfinished.id)} primary />
+          <ActionButton icon="add" label="Start a new scan" onPress={() => scan()} />
         </>
       ) : (
-        <Button icon="scan-outline" label="Scan this wall" onPress={() => scan()} primary />
+        <ActionButton icon="scan-outline" label="Scan this wall" onPress={() => scan()} primary />
       )}
     </View>
-  );
-}
-
-function Button({
-  icon,
-  label,
-  onPress,
-  primary,
-}: {
-  icon: 'play' | 'add' | 'scan-outline';
-  label: string;
-  onPress: () => void;
-  primary?: boolean;
-}) {
-  const theme = useTheme();
-  const color = primary ? theme.accentText : theme.text;
-  return (
-    <Pressable
-      role="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        primary ? { backgroundColor: theme.accent } : { borderColor: theme.border, borderWidth: 1 },
-        pressed && styles.pressed,
-      ]}>
-      <Ionicons name={icon} size={20} color={color} />
-      <AppText style={[styles.buttonText, { color }]}>{label}</AppText>
-    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: { gap: Spacing.two, padding: Spacing.three, borderRadius: 12 },
   heading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  button: {
-    minHeight: TapTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.two,
-    borderRadius: 12,
-  },
-  buttonText: { fontWeight: '700' },
-  pressed: { opacity: 0.8 },
 });

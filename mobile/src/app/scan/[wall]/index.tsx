@@ -1,15 +1,16 @@
 import { type Href, router, Stack, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { MaxContentWidth, SerifFont, Spacing, TapTarget } from '@/constants/theme';
+import { MaxContentWidth, SerifFont, Spacing } from '@/constants/theme';
 import { useArea } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { Loading, Message } from '@/ui/components';
+import { ActionButton, scanHref } from '@/ui/scan/controls';
 import { AppText } from '@/ui/text';
 
 const STEPS = [
   'A short guide to taking the photos',
-  'Walk along the wall, taking about 30 photos',
+  'Walk along the wall taking photos, about 20 to 50 depending on its size',
   'Look through them, then upload on Wi-Fi',
   'The team makes the 3D model and draws the routes on it',
 ];
@@ -71,15 +72,9 @@ export default function ScanStartScreen() {
             <AppText style={styles.flex}>{step}</AppText>
           </View>
         ))}
-        <Pressable
-          role="button"
-          disabled
-          style={[styles.start, { backgroundColor: theme.accent }, styles.disabled]}>
-          <AppText style={[styles.startText, { color: theme.accentText }]}>Start</AppText>
-        </Pressable>
-        <AppText type="small" color="textSecondary" style={styles.center}>
-          Coming soon: the guide and camera are next.
-        </AppText>
+        <View style={styles.start}>
+          <ActionButton label="Start" onPress={() => router.push(scanHref(wall, 'guide'))} primary />
+        </View>
       </ScrollView>
     </>
   );
@@ -98,16 +93,7 @@ const styles = StyleSheet.create({
   stepNumber: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   stepNumberText: { fontWeight: '700' },
   flex: { flex: 1 },
-  start: {
-    minHeight: TapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    marginTop: Spacing.two,
-  },
-  startText: { fontWeight: '700' },
-  disabled: { opacity: 0.5 },
-  center: { textAlign: 'center' },
+  start: { marginTop: Spacing.two },
   closeButton: { paddingHorizontal: Spacing.three },
   close: { fontWeight: '600' },
   pressed: { opacity: 0.6 },

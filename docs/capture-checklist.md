@@ -1,6 +1,6 @@
 # Capture Checklist
 
-How the team photographs a wall for a 3D model. It's still a working list: #17 is comparing capture methods to settle on one, and the in-app camera guide (#50) will follow whatever it decides.
+How the team photographs a wall for a 3D model. It's still a working list: #17 is comparing capture methods to settle on one. The app's capture guide (#50) shows the photo-taking tips as cards and asks about the light before scanning, so change those in `mobile/src/ui/scan/guide.tsx` too.
 
 Walk along the wall and take one photo every step, starting and ending a step past each edge. Bigger walls just mean more photos.
 

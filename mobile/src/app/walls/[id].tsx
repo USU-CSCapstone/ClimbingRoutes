@@ -5,7 +5,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useLatestModel } from '@/data/models';
 import { useArea } from '@/data/queries';
 import { Loading, Message } from '@/ui/components';
-import { ScanCard } from '@/ui/scan-card';
+import { ScanCard } from '@/ui/scan/scan-card';
 import { WallView } from '@/ui/wall/wall-view';
 
 /** /walls/<OpenBeta area uuid>?route=<uuid> opens the wall's newest published model, with that route selected. */

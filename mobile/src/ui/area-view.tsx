@@ -17,7 +17,7 @@ import {
   WallLink,
 } from '@/ui/components';
 import { useHrefs } from '@/ui/nav';
-import { ScanCard, useNeedsScan } from '@/ui/scan-card';
+import { ScanCard, useNeedsScan } from '@/ui/scan/scan-card';
 import { AppText } from '@/ui/text';
 
 type Item =
