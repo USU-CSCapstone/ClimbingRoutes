@@ -1,12 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { photoTarget, WALL_SIZES, type WallSize } from '@/core/scan-plan';
 import { useTheme } from '@/hooks/use-theme';
-import { ActionButton, Choice, closeScan, Question } from '@/ui/scan/controls';
+import { ActionButton, Choice, closeScan, Question, scanHref } from '@/ui/scan/controls';
 import { AppText } from '@/ui/text';
 
 /**
@@ -15,6 +15,7 @@ import { AppText } from '@/ui/text';
  * size sets the photo target the camera (#51) counts towards.
  */
 export default function PrepareScreen() {
+  const { wall } = useLocalSearchParams<{ wall: string }>();
   const theme = useTheme();
   const [sun, setSun] = useState<'sunny' | 'shade' | null>(null);
   const [scanInSun, setScanInSun] = useState(false);
@@ -75,10 +76,12 @@ export default function PrepareScreen() {
             <AppText color="textSecondary" style={styles.center}>
               One photo per step, from a step before one end of the wall to a step past the other.
             </AppText>
-            <ActionButton label="Open the camera" icon="camera-outline" primary disabled />
-            <AppText type="small" color="textSecondary" style={styles.center}>
-              Coming soon: the camera is next.
-            </AppText>
+            <ActionButton
+              label="Open the camera"
+              icon="camera-outline"
+              primary
+              onPress={() => router.push(scanHref(wall, 'camera', { size, sun: sun === 'sunny' ? 'sunny' : 'shade' }))}
+            />
           </View>
         ) : null}
       </ScrollView>

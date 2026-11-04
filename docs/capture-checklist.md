@@ -8,7 +8,7 @@ Walk along the wall and take one photo every step, starting and ending a step pa
 - Keep lots of overlap, so each photo looks almost like the last
 - Stay on the 1x lens and hold still
 - Overcast light is best, since hard shadows get baked into the model
-- For the top of the wall, walk closer instead of zooming
+- For the top of the wall, walk it again from about as far back as the wall is tall, with the phone tilted up, rather than zooming or walking closer. From close to the base the top is seen at too steep an angle to show much detail. This comes from the geometry and hasn't been tested yet (#17)
 - Transfer originals by cable or Google Drive, not Google Photos or messaging apps
 
 ## What's worked so far

@@ -9,9 +9,10 @@ import { AppText } from '@/ui/text';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
-/** A screen of the scan flow for a wall: /scan/<wall>, or /scan/<wall>/<step>. */
-export function scanHref(wall: string, step?: 'guide' | 'prepare'): Href {
-  return (step ? `/scan/${wall}/${step}` : `/scan/${wall}`) as Href;
+/** A screen of the scan flow for a wall: /scan/<wall>, or /scan/<wall>/<step>, with any search params. */
+export function scanHref(wall: string, step?: 'guide' | 'prepare' | 'camera', params?: Record<string, string>): Href {
+  const pathname = step ? `/scan/${wall}/${step}` : `/scan/${wall}`;
+  return (params ? { pathname, params } : pathname) as Href;
 }
 
 /**
