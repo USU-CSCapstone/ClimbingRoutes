@@ -126,7 +126,7 @@ function Camera({
     try {
       // exif: true is what writes the lens EXIF RealityScan needs into the JPEG.
       const photo = await camera.current.takePictureAsync({ quality: QUALITY, exif: true });
-      saved.current ??= createScan(wallUuid, plan);
+      saved.current ??= createScan(wallUuid, 'camera', plan);
       saved.current = await savePhoto(saved.current, photo, details);
       setScan(saved.current);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});

@@ -6,8 +6,9 @@ import { scanHref } from '@/ui/scan/controls';
 import { GuideCards, GuideReminder } from '@/ui/scan/guide';
 
 /**
- * /scan/<wall>/guide: the capture guide (#50). The full set of cards the first
- * time on this device, then a one-screen reminder that can open the full set.
+ * /scan/<wall>/guide: the capture guide (#50), for photos taken in the app. The
+ * full set of cards the first time on this device, then a one-screen reminder
+ * that can open the full set.
  */
 export default function GuideScreen() {
   const { wall } = useLocalSearchParams<{ wall: string }>();

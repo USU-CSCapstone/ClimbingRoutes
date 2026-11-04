@@ -6,13 +6,13 @@ import { GuidedCamera } from '@/ui/scan/camera';
 import { closeScan } from '@/ui/scan/controls';
 
 /**
- * /scan/<wall>/camera?size=…&sun=…: the guided camera (#51), opened from
- * "Before you start" (#50) with its answers, which go into the scan.
+ * /scan/<wall>/camera?size=…: the guided camera (#51), opened from "Before you
+ * start" (#50) with the wall's size, which goes into the scan.
  */
 export default function CameraScreen() {
-  const { wall, size, sun } = useLocalSearchParams<{ wall: string; size?: string; sun?: string }>();
+  const { wall, size } = useLocalSearchParams<{ wall: string; size?: string }>();
   const wallSize = WALL_SIZES.find((option) => option.size === size)?.size ?? 'medium';
-  const plan: ScanPlan = { wallSize, inSun: sun === 'sunny', target: photoTarget(wallSize) };
+  const plan: ScanPlan = { wallSize, target: photoTarget(wallSize) };
 
   return (
     <>

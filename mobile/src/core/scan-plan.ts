@@ -1,7 +1,11 @@
 // How many photos a scan should aim for, from the wall's size. The capture
 // checklist asks for one photo per step along the wall, starting and ending a
 // step past each edge; 16 was enough for a first model and the best one used 47.
-// Upload needs at least 16 (#52), so the smallest target stays above that.
+// Upload needs at least 16, so the smallest target stays above that. Only the
+// in-app camera lane asks the wall's size; uploads go straight to picking photos.
+
+/** The fewest photos a scan can upload with (#52). */
+export const MIN_PHOTOS = 16;
 
 export type WallSize = 'small' | 'medium' | 'large';
 

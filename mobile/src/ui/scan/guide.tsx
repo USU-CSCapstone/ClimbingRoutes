@@ -15,12 +15,17 @@ interface Tip {
   Art: () => ReactNode;
 }
 
-/** The capture checklist (docs/capture-checklist.md) as the four cards of the guide. */
+/**
+ * The parts of the capture checklist (docs/capture-checklist.md) that the in-app
+ * camera needs, as the guide's three cards. The camera keeps itself on the 1x
+ * lens with no zoom, so there's no card for that.
+ */
 const TIPS: Tip[] = [
   {
     icon: 'footsteps-outline',
     title: 'Step sideways',
-    detail: "Walk along the wall and take a photo every step. Don't stand in one place and turn.",
+    detail:
+      "Walk along the wall and take a photo every step, holding still for each one. Don't stand in one place and turn.",
     Art: StepSideways,
   },
   {
@@ -29,12 +34,6 @@ const TIPS: Tip[] = [
     detail:
       'Each photo should have overlap from the last photo. Start and finish a step past each end of the wall.',
     Art: Overlap,
-  },
-  {
-    icon: 'aperture-outline',
-    title: 'Stay on the 1x lens',
-    detail: "Don't switch to 0.5x or zoom in, and hold still for each photo.",
-    Art: Lens,
   },
   {
     icon: 'arrow-back-outline',
@@ -131,7 +130,7 @@ export function GuideReminder({ onContinue, onShowAll }: { onContinue: () => voi
   const theme = useTheme();
   return (
     <ScrollView contentContainerStyle={styles.reminder}>
-      <AppText color="textSecondary">The same four things as last time:</AppText>
+      <AppText color="textSecondary">The same three things as last time:</AppText>
       {TIPS.map((tip) => (
         <View key={tip.title} style={styles.reminderRow}>
           <View style={[styles.reminderIcon, { backgroundColor: theme.backgroundElement }]}>
@@ -274,24 +273,6 @@ function Overlap() {
   );
 }
 
-/** A camera's lens picker with 1x chosen. */
-function Lens() {
-  return (
-    <Frame>
-      <View style={styles.lensPicker}>
-        {['.5', '1×', '2'].map((lens) => {
-          const chosen = lens === '1×';
-          return (
-            <View key={lens} style={[styles.lens, chosen && styles.lensChosen]}>
-              <AppText style={[styles.lensText, { color: chosen ? '#FFD60A' : '#FFFFFF' }]}>{lens}</AppText>
-            </View>
-          );
-        })}
-      </View>
-    </Frame>
-  );
-}
-
 /**
  * Both passes from above: the first, close to the wall (faded), then the second,
  * further back and walking the other way, back to where the first one started.
@@ -351,15 +332,5 @@ const styles = StyleSheet.create({
   wallStrip: { position: 'absolute', top: 18, left: 24, right: 24, height: 14, borderRadius: 4, opacity: 0.5 },
   photos: { width: 162, height: 64 },
   photo: { position: 'absolute', top: 0, width: 90, height: 64, borderRadius: 6, borderWidth: 2 },
-  lensPicker: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    padding: Spacing.two,
-    borderRadius: 999,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-  },
-  lens: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  lensChosen: { backgroundColor: 'rgba(255, 255, 255, 0.18)' },
-  lensText: { fontWeight: '700' },
   faded: { opacity: 0.4 },
 });

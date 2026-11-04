@@ -1,7 +1,7 @@
 // A scan on the phone: one wall's photos and what was known when each was taken.
-// The camera (#51) writes scans and the upload queue (#45) reads them, so these
-// types are the handoff between the two. Drafted for #51; #44 owns them, along
-// with listing unfinished scans and deleting a scan's files.
+// The camera (#51) and the photo picker (#52) write scans and the upload queue
+// (#45) reads them, so these types are the handoff between them. Drafted for #51;
+// #44 owns them, along with listing unfinished scans and deleting a scan's files.
 //
 // Each scan is a folder on the phone holding its photos and a scan.json
 // manifest, which is a Scan as JSON. Photos are only kept until upload is
@@ -19,11 +19,15 @@ export const MANIFEST_FILE = 'scan.json';
 /** Still taking or reviewing photos, then uploading (#45). */
 export type ScanStatus = 'draft' | 'uploading';
 
-/** The answers from "Before you start" (#50). */
+/**
+ * Which way the photos came in, picked on the scan's first screen: taken with
+ * the guided camera (#51), or uploaded from photos taken outside the app (#52).
+ */
+export type ScanSource = 'camera' | 'upload';
+
+/** The answer from "Before you start" (#50), asked before the camera only. */
 export interface ScanPlan {
   wallSize: WallSize;
-  /** The climber scanned anyway after being told the wall was in direct sun. */
-  inSun: boolean;
   /** The "Aim for about …" photo count. */
   target: number;
 }
@@ -65,9 +69,11 @@ export interface Scan {
   /** OpenBeta area uuid of the wall. */
   wallUuid: Uuid;
   status: ScanStatus;
+  source: ScanSource;
   /** ISO time the scan was started. */
   createdAt: string;
-  plan: ScanPlan;
+  /** Null for uploads, which go straight to picking photos. */
+  plan: ScanPlan | null;
   /** In the order they were taken. */
   photos: ScanPhoto[];
 }

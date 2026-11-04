@@ -5,7 +5,15 @@
 // only: on the web, photos come from the computer instead (#52).
 import { Directory, File, Paths } from 'expo-file-system';
 
-import { MANIFEST_FILE, MANIFEST_VERSION, nextPhotoFile, type Scan, type ScanPhoto, type ScanPlan } from '@/core/capture';
+import {
+  MANIFEST_FILE,
+  MANIFEST_VERSION,
+  nextPhotoFile,
+  type Scan,
+  type ScanPhoto,
+  type ScanPlan,
+  type ScanSource,
+} from '@/core/capture';
 import type { Uuid } from '@/core/types';
 
 /** A photo as the camera hands it over, in a temporary file. */
@@ -30,7 +38,7 @@ function writeManifest(scan: Scan) {
 }
 
 /** Starts a scan of a wall: its folder and a manifest with no photos yet. */
-export function createScan(wallUuid: Uuid, plan: ScanPlan): Scan {
+export function createScan(wallUuid: Uuid, source: ScanSource, plan: ScanPlan | null): Scan {
   const now = new Date();
   const scan: Scan = {
     version: MANIFEST_VERSION,
@@ -38,6 +46,7 @@ export function createScan(wallUuid: Uuid, plan: ScanPlan): Scan {
     id: `${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     wallUuid,
     status: 'draft',
+    source,
     createdAt: now.toISOString(),
     plan,
     photos: [],
