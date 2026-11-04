@@ -64,7 +64,7 @@ Supabase: accounts, the wall model list, route lines and model files. The schema
 
    It should end with `53 of 53 passed`. Run it after any change to `migrations/`
 
-**Applying a new migration:** add a file to `supabase/migrations/`, then from the repo root run `npx supabase login` once, `npx supabase link --project-ref ccflxypdobybekmsvbvn` once, and `npx supabase db push`.
+**Applying a new migration:** add a file to `supabase/migrations/`, then from the repo root run `npx supabase login` once, `npx supabase link --project-ref ccflxypdobybekmsvbvn` once, and `npx supabase db push --remote` (without `--remote`, newer CLI versions push to a local stack).
 
 **Starting a new project from scratch:** follow [supabase/README.md](../supabase/README.md#setting-up-the-project), then put its URL and publishable key in `mobile/src/core/config.ts`.
 

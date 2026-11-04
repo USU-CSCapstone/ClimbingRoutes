@@ -40,7 +40,7 @@ The team's project already exists. These steps are for making a new one; to work
    - each of your personal accounts
    - the shared moderator account, such as a `+moderator` alias of a team inbox
 4. Apply the migrations, either way:
-   - CLI: `npx supabase login`, `npx supabase link --project-ref <ref>`, `npx supabase db push`
+   - CLI: `npx supabase login`, `npx supabase link --project-ref <ref>`, `npx supabase db push --remote`
    - or paste each file in `migrations/` into the **SQL Editor**, in order
 5. Make the moderator account the only moderator, in the **SQL Editor**:
 
