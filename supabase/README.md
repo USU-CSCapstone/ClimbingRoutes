@@ -16,12 +16,14 @@ The backend for wall models: accounts, the capture job queue, model versions, ro
 | Review a model (publish or reject, with a note) | – | – | yes | all |
 | Write route lines | – | – | yes | all |
 | Add files to `models` | – | – | only for an existing model row | all |
-| Captures and their photos | – | own: start, upload while uploading, mark uploaded, cancel while uploading | read and delete any | all |
+| Remove files from `models` | – | – | only of unpublished models | all |
+| Captures, their photos and `scan.json` | – | own: start, upload while uploading, mark uploaded, cancel while uploading | read and delete any | all |
+| Claim an uploaded capture (`claim_capture()`) | – | – | – | yes |
 | Profiles | – | read own | read all | all |
 
 Also enforced in the database:
 
-- A model version's file path never changes, and nothing in `models` is overwritten or deleted through the API
+- A model version's file path never changes, and a published model's file is never overwritten or removed through the API
 - Review status only goes `needs_review` → `published` or `rejected`, once, and records who reviewed it and when
 - A model can't be published until its file is in `models`
 - `is_moderator` can only be changed in SQL
@@ -60,18 +62,19 @@ The team's project already exists. These steps are for making a new one; to work
 
 ## Test plan
 
-`npm run check` signs in signed-out, as `REGULAR_EMAIL` and as the moderator. It runs 48 checks, makes its own fixtures under a made-up wall, and removes them afterwards. It exits non-zero if anything fails. Run it after every migration. It covers:
+`npm run check` signs in signed-out, as `REGULAR_EMAIL` and as the moderator. It runs 53 checks, makes its own fixtures under a made-up wall, and removes them afterwards. It exits non-zero if anything fails. Run it after every migration. It covers:
 
-- **Signed out and regular:** can't see unpublished models, their route lines or `review` files. Can't add model rows, upload to `models` or `review`, or see anyone else's captures or photos
+- **Signed out and regular:** can't see unpublished models, their route lines or `review` files. Can't add model rows, upload to `models` or `review`, see anyone else's captures or photos, or claim captures
 - **Regular:**
   - Sees only their own profile, and can't make themselves a moderator
   - Can't change a model's review status, or add, edit or delete route lines
-  - Can start their own capture and upload photos to it, but not into anyone else's capture, and can't overwrite photos
+  - Can start their own capture and upload photos and `scan.json` to it, but not into anyone else's capture, and can't overwrite photos
   - Can't set `processing` or a failure reason. Once marked uploaded, can't change the capture, add photos or delete it
 - **Moderator:**
   - Sees unpublished models and every capture, and downloads from `review`
   - Rejecting a model records who and when, and the decision can't be changed afterwards
-  - Can't publish before the file is in `models`, change a version's path, or delete a published model
+  - Can't publish before the file is in `models`, change a version's path, delete a published model, or claim captures
+  - Can remove an unpublished model's file from `models`
 
 Then by hand, in the app on web and in Expo Go:
 

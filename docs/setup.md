@@ -62,7 +62,7 @@ Supabase: accounts, the wall model list, route lines and model files. The schema
    npm run check
    ```
 
-   It should end with `48 of 48 passed`. Run it after any change to `migrations/`
+   It should end with `53 of 53 passed`. Run it after any change to `migrations/`
 
 **Applying a new migration:** add a file to `supabase/migrations/`, then from the repo root run `npx supabase login` once, `npx supabase link --project-ref ccflxypdobybekmsvbvn` once, and `npx supabase db push`.
 
@@ -87,6 +87,10 @@ To publish a wall that has no model yet, with its lines, as v1: from `supabase/`
 ## Make a wall model
 
 On the team PC: Windows, an NVIDIA GPU, Node, and RealityScan 2.2 installed through the Epic Games Launcher (the script looks for `RealityScan.exe` under `C:\Program Files\Epic Games`).
+
+Photos taken in the app upload as a capture. On the team PC, `scripts/captures/` downloads each one, and after RealityScan puts the model up for the moderator's review. See [scripts/captures/README.md](../scripts/captures/README.md).
+
+To run RealityScan on a folder of photos by hand:
 
 1. Photograph the wall with the [capture checklist](capture-checklist.md)
 2. Copy the photos to a folder on the team PC

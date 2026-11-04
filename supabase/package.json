@@ -5,7 +5,8 @@
   "description": "Seed and access checks for the team's Supabase project",
   "scripts": {
     "seed": "node --env-file=.env seed.mjs",
-    "check": "node --env-file=.env tests/rls-check.mjs"
+    "check": "node --env-file=.env tests/rls-check.mjs",
+    "upload": "node --env-file=.env upload-capture.mjs"
   },
   "engines": {
     "node": ">=22"
