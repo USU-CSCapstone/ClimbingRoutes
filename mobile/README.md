@@ -56,7 +56,7 @@ Then open http://localhost:8081/author. Pick a route, click **Draw**, and click 
 
 ## Layout
 
-- `src/app/` screens and navigation (Expo Router). Explore, Map and Search share the area and route pages through the `(explore,map,search)` group. `walls/` is the 3D wall page, and `moderate/` the moderator section
+- `src/app/` screens and navigation (Expo Router). Explore, Map and Search share the area and route pages through the `(explore,map,search)` group. `walls/` is the 3D wall page, `scan/` the full-screen scan flow for a wall without a model, and `moderate/` the moderator section
 - `src/core/` types, OpenBeta client, search, grades. No React imports, so Node scripts can reuse it (enforced by lint)
 - `src/data/` React Query hooks and caching, and the Supabase client (`supabase.ts`) and sign-in (`auth.ts`)
 - `src/ui/` shared components

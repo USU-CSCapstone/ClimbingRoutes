@@ -1,6 +1,6 @@
 # Capture Checklist
 
-How the team photographs a wall for a 3D model. It's still a working list: #17 is comparing capture methods to settle on one, and the in-app camera guide (#50) will follow whatever it decides.
+How the team photographs a wall for a 3D model. It's still a working list: #17 is comparing capture methods to settle on one. The app's guide for its in-app camera (#50) shows the walking tips as three cards, so change those in `mobile/src/ui/scan/guide.tsx` too. The camera keeps itself on 1x. The full list, light included, is meant for the photo tips on the landing page planned for a later milestone, for photos taken outside the app.
 
 Walk along the wall and take one photo every step, starting and ending a step past each edge. Bigger walls just mean more photos.
 
@@ -8,7 +8,7 @@ Walk along the wall and take one photo every step, starting and ending a step pa
 - Keep lots of overlap, so each photo looks almost like the last
 - Stay on the 1x lens and hold still
 - Overcast light is best, since hard shadows get baked into the model
-- For the top of the wall, walk closer instead of zooming
+- For the top of the wall, walk it again from about as far back as the wall is tall, with the phone tilted up, rather than zooming or walking closer. From close to the base the top is seen at too steep an angle to show much detail. This comes from the geometry and hasn't been tested yet (#17)
 - Transfer originals by cable or Google Drive, not Google Photos or messaging apps
 
 ## What's worked so far
