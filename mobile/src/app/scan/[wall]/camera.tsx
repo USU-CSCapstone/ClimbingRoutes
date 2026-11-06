@@ -10,15 +10,15 @@ import { closeScan, scanHref } from '@/ui/scan/controls';
 
 /**
  * /scan/<wall>/camera?size=…: the guided camera (#51), opened from "Before you
- * start" (#50) with the wall's size, which goes into the scan. ?scan=<id> carries
- * on with a scan instead, for review's "Take more" (#52). Done replaces it with
- * review, which comes back here the same way.
+ * start" (#50) with the wall's size, which goes into the scan. ?scan=<id> adds
+ * photos to an unfinished scan instead, with its own answer: review's "Take
+ * more" (#52) and the wall's Resume (#49). Done replaces it with review.
  */
 export default function CameraScreen() {
-  const { wall, size, scan: scanId } = useLocalSearchParams<{ wall: string; size?: string; scan?: string }>();
-  const [existing] = useState(() => (scanId ? readScan(scanId) : null));
+  const { wall, size, scan } = useLocalSearchParams<{ wall: string; size?: string; scan?: string }>();
+  const [resume] = useState(() => (scan ? readScan(scan) : null));
 
-  if (scanId && !existing) {
+  if (scan && !resume) {
     return (
       <>
         <Stack.Screen options={{ title: 'Camera' }} />
@@ -28,7 +28,7 @@ export default function CameraScreen() {
   }
 
   const wallSize = WALL_SIZES.find((option) => option.size === size)?.size ?? 'medium';
-  const plan: ScanPlan = existing?.plan ?? { wallSize, target: photoTarget(wallSize) };
+  const plan: ScanPlan = resume?.plan ?? { wallSize, target: photoTarget(wallSize) };
 
   return (
     <>
@@ -36,9 +36,9 @@ export default function CameraScreen() {
       <GuidedCamera
         wallUuid={wall}
         plan={plan}
-        initial={existing}
+        resume={resume}
         onClose={closeScan}
-        onDone={(scan) => router.replace(scanHref(wall, 'review', { scan: scan.id }))}
+        onDone={(done) => router.replace(scanHref(wall, 'review', { scan: done.id }))}
       />
     </>
   );

@@ -1,7 +1,7 @@
 // A scan on the phone: one wall's photos and what was known when each was taken.
 // The camera (#51) and the photo picker (#52) write scans and the upload queue
-// (#45) reads them, so these types are the handoff between them. Drafted for #51;
-// #44 owns them, along with listing unfinished scans and deleting a scan's files.
+// (#45) reads them, so these types are the handoff between them. The scan
+// storage that keeps them is src/data/scans.ts (#44).
 //
 // Each scan is a folder on the phone holding its photos and a scan.json
 // manifest, which is a Scan as JSON. Photos are only kept until upload is
@@ -18,6 +18,16 @@ export const MANIFEST_FILE = 'scan.json';
 
 /** Still taking or reviewing photos, then uploading (#45). */
 export type ScanStatus = 'draft' | 'uploading';
+
+/** How far an upload has got, kept in the manifest so it carries on after a restart. */
+export interface ScanUpload {
+  /** The account that started it. Signed in as another, the upload starts over. */
+  userId: string;
+  /** The server's capture row. */
+  captureId: string;
+  /** Photos the server has confirmed. */
+  uploaded: string[];
+}
 
 /**
  * Which way the photos came in, picked on the scan's first screen: taken with
@@ -94,6 +104,8 @@ export interface Scan {
   plan: ScanPlan | null;
   /** In the order they were taken. */
   photos: ScanPhoto[];
+  /** Set once the upload has started. */
+  upload?: ScanUpload;
 }
 
 /** A new scan of a wall with no photos yet, for the scan storage to keep. */
@@ -120,6 +132,13 @@ export function newScan(wallUuid: Uuid, source: ScanSource, plan: ScanPlan | nul
 export function nextPhotoFile(photos: Pick<ScanPhoto, 'file'>[], extension: PhotoExtension = 'jpg'): string {
   const last = Math.max(0, ...photos.map((p) => Number(/\d+/.exec(p.file)?.[0] ?? 0)));
   return `photo-${String(last + 1).padStart(3, '0')}.${extension}`;
+}
+
+/** A scan photo's MIME type, from its file name, to upload it with. */
+export function photoMimeType(file: string): string {
+  if (file.endsWith('.heic')) return 'image/heic';
+  if (file.endsWith('.heif')) return 'image/heif';
+  return 'image/jpeg';
 }
 
 /**

@@ -40,14 +40,14 @@ type Direction = 'right' | 'left';
 export function GuidedCamera({
   wallUuid,
   plan,
-  initial,
+  resume,
   onClose,
   onDone,
 }: {
   wallUuid: Uuid;
   plan: ScanPlan;
-  /** A scan to carry on with, for "Take more" in review. */
-  initial: Scan | null;
+  /** An unfinished scan to add photos to instead of starting a new one, for "Take more" and Resume. */
+  resume?: Scan | null;
   onClose: () => void;
   onDone: (scan: Scan) => void;
 }) {
@@ -74,7 +74,7 @@ export function GuidedCamera({
     <Camera
       wallUuid={wallUuid}
       plan={plan}
-      initial={initial}
+      resume={resume}
       withLocation={location.granted}
       onClose={onClose}
       onDone={onDone}
@@ -85,14 +85,14 @@ export function GuidedCamera({
 function Camera({
   wallUuid,
   plan,
-  initial,
+  resume,
   withLocation,
   onClose,
   onDone,
 }: {
   wallUuid: Uuid;
   plan: ScanPlan;
-  initial: Scan | null;
+  resume?: Scan | null;
   withLocation: boolean;
   onClose: () => void;
   onDone: (scan: Scan) => void;
@@ -105,9 +105,9 @@ function Camera({
   const angle = useRef<PhotoAngle | null>(null);
   // What the next save builds on. A ref, so a second tap before the screen
   // re-renders can't start a second scan.
-  const saved = useRef<Scan | null>(initial);
+  const saved = useRef<Scan | null>(resume ?? null);
   const shooting = useRef(false);
-  const [scan, setScan] = useState<Scan | null>(initial);
+  const [scan, setScan] = useState<Scan | null>(resume ?? null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [direction, setDirection] = useState<Direction>('right');

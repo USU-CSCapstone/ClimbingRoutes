@@ -1,9 +1,14 @@
 // Scans on the web, kept in memory with the same functions as scans.ts. A
 // browser has no folder to keep them in, so a scan lasts as long as the page.
 // Only the upload lane runs on the web, with photos picked from the computer
-// (#52), and each photo stays a blob URL for its file until it's sent.
+// (#52), and each photo stays a blob URL for its file. The upload queue (#45)
+// doesn't run on the web yet, so listing finds no scans and they can't be sent:
+// the wall's scan card and the queue leave the web alone.
 import { newScan, nextPhotoFile, type Scan, type ScanPhoto, type ScanPlan, type ScanSource, type TakenPhoto } from '@/core/capture';
 import type { Uuid } from '@/core/types';
+
+const NOT_ON_WEB = "Scans can't be uploaded from the web yet";
+const NO_SCANS: Scan[] = [];
 
 const scans = new Map<string, Scan>();
 /** Blob URLs by scan id, then file name. */
@@ -18,6 +23,18 @@ export function createScan(wallUuid: Uuid, source: ScanSource, plan: ScanPlan | 
 
 export function readScan(id: string): Scan | null {
   return scans.get(id) ?? null;
+}
+
+export function updateScan(scan: Scan) {
+  if (scans.has(scan.id)) scans.set(scan.id, scan);
+}
+
+export function listScans(): Scan[] {
+  return NO_SCANS;
+}
+
+export function useScans(): Scan[] {
+  return NO_SCANS;
 }
 
 export async function savePhoto(
@@ -44,6 +61,20 @@ export function deletePhoto(scan: Scan, photo: ScanPhoto): Scan {
   return kept;
 }
 
+export function deleteScan(id: string) {
+  for (const uri of uris.get(id)?.values() ?? []) URL.revokeObjectURL(uri);
+  uris.delete(id);
+  scans.delete(id);
+}
+
 export function photoUri(scan: Scan, photo: ScanPhoto): string {
   return uris.get(scan.id)?.get(photo.file) ?? '';
+}
+
+export function bytesLeft(_scan: Scan): number {
+  return 0;
+}
+
+export function photoFile(_scan: Scan, _photo: ScanPhoto): never {
+  throw new Error(NOT_ON_WEB);
 }

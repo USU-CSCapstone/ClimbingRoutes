@@ -87,6 +87,7 @@ async function run() {
     );
     await check(`${who}: can't see other people's captures`, async () => blocked(await db.from("captures").select().eq("id", modCapture.id)));
     await check(`${who}: can't download other people's photos`, async () => blocked(await db.storage.from("captures").download(modPhoto)));
+    await check(`${who}: can't claim captures`, async () => blocked(await db.rpc("claim_capture")));
   }
   await check("signed out: can't start a capture", async () => blocked(await anon.from("captures").insert({ wall_uuid: FIXTURE_WALL }).select()));
 
@@ -124,6 +125,9 @@ async function run() {
   );
   await check("regular: uploads a photo to their capture", async () =>
     allowed(await user.storage.from("captures").upload(photo(1), PHOTO, { contentType: "image/jpeg" })),
+  );
+  await check("regular: uploads scan.json to their capture", async () =>
+    allowed(await user.storage.from("captures").upload(`${regular.id}/${capture.id}/scan.json`, Buffer.from("{}"), { contentType: "application/json" })),
   );
   await check("regular: can't upload into someone else's capture", async () =>
     blocked(await user.storage.from("captures").upload(`${moderator.id}/${modCapture.id}/0002.jpg`, PHOTO, { contentType: "image/jpeg" })),
@@ -175,6 +179,12 @@ async function run() {
   await check("moderator: can't change a version's file path", async () =>
     blocked(await mod.from("wall_models").update({ glb_path: `${FIXTURE_WALL}/v98.glb` }).eq("id", unpublishable.id).select()),
   );
+  await check("moderator: can't claim captures", async () => blocked(await mod.rpc("claim_capture")));
+  await check("moderator: removes an unpublished model's file from models", async () => {
+    must("upload to models", await mod.storage.from("models").upload(unpublishable.glb_path, Buffer.from("glTF"), { contentType: GLB_TYPE }));
+    const removed = must("remove it", await mod.storage.from("models").remove([unpublishable.glb_path]));
+    return removed.length === 1 || "nothing removed";
+  });
   await check("moderator: can't upload to models without a model row", async () =>
     blocked(await mod.storage.from("models").upload(`${FIXTURE_WALL}/v99.glb`, Buffer.from("glTF"), { contentType: GLB_TYPE })),
   );
@@ -225,5 +235,7 @@ async function cleanup() {
   must("delete fixture captures", await mod.from("captures").delete().eq("wall_uuid", FIXTURE_WALL));
   const reviewFiles = must("list review", await mod.storage.from("review").list(FIXTURE_WALL));
   if (reviewFiles.length) must("remove review files", await mod.storage.from("review").remove(reviewFiles.map((f) => `${FIXTURE_WALL}/${f.name}`)));
+  const modelFiles = must("list fixture model files", await mod.storage.from("models").list(FIXTURE_WALL));
+  if (modelFiles.length) must("remove fixture model files", await mod.storage.from("models").remove(modelFiles.map((f) => `${FIXTURE_WALL}/${f.name}`)));
   must("delete fixture models", await mod.from("wall_models").delete().eq("wall_uuid", FIXTURE_WALL));
 }

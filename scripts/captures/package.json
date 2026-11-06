@@ -1,0 +1,16 @@
+{
+  "name": "climbingroutes-captures",
+  "private": true,
+  "type": "module",
+  "description": "Team PC scripts that turn uploaded captures into models for review",
+  "scripts": {
+    "pull": "node --env-file=.env pull.mjs",
+    "finish": "node --env-file=.env finish.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0"
+  }
+}
