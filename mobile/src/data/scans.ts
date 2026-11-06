@@ -1,9 +1,10 @@
 // Scans kept on the phone until they're uploaded: one folder each, holding the
-// photos and a scan.json manifest (src/core/capture.ts). Drafted for the camera
-// (#51) with only what it needs, starting a scan and saving each photo into it.
-// #44 adds listing unfinished scans and deleting a scan's files. iOS and Android
-// only: on the web, photos come from the computer instead (#52).
+// photos and a scan.json manifest (src/core/capture.ts). The camera (#51)
+// writes them, the upload queue (#45) reads them, and screens list them with
+// useScans(). iOS and Android only: on the web, scans.web.ts has none, and
+// photos come from the computer instead (#52).
 import { Directory, File, Paths } from 'expo-file-system';
+import { useSyncExternalStore } from 'react';
 
 import {
   MANIFEST_FILE,
@@ -24,8 +25,21 @@ export interface TakenPhoto {
 }
 
 /** In documents rather than the cache, which the system can clear while a scan waits for Wi-Fi. */
+function scansRoot(): Directory {
+  return new Directory(Paths.document, 'scans');
+}
+
 function scanFolder(id: string): Directory {
   return new Directory(Paths.document, 'scans', id);
+}
+
+// Screens re-read the list whenever a scan is saved or deleted.
+const listeners = new Set<() => void>();
+let snapshot: Scan[] | null = null;
+
+function changed() {
+  snapshot = null;
+  for (const listener of listeners) listener();
 }
 
 /** Writes beside the manifest, then moves over it, so a crash mid-write can't leave half a manifest. */
@@ -35,6 +49,64 @@ function writeManifest(scan: Scan) {
   temp.create({ overwrite: true });
   temp.writeSync(JSON.stringify(scan, null, 2));
   temp.moveSync(new File(folder, MANIFEST_FILE), { overwrite: true });
+  changed();
+}
+
+/** Saves a changed scan, like a new status or upload progress. */
+export function updateScan(scan: Scan) {
+  writeManifest(scan);
+}
+
+/** The scan with this id, or null if it's gone or its manifest can't be read. */
+export function readScan(id: string): Scan | null {
+  try {
+    const file = new File(scanFolder(id), MANIFEST_FILE);
+    if (!file.exists) return null;
+    const scan = JSON.parse(file.textSync()) as Scan;
+    return scan.version === MANIFEST_VERSION ? scan : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Every scan on the phone, newest first. */
+export function listScans(): Scan[] {
+  const root = scansRoot();
+  if (!root.exists) return [];
+  return root
+    .list()
+    .flatMap((entry) => (entry instanceof Directory ? [readScan(entry.name)] : []))
+    .filter((scan): scan is Scan => scan != null)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Every scan on the phone, newest first, kept up to date as scans change. */
+export function useScans(): Scan[] {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => (snapshot ??= listScans()),
+  );
+}
+
+/** Deletes a scan's photos and manifest from the phone. */
+export function deleteScan(id: string) {
+  const folder = scanFolder(id);
+  if (folder.exists) folder.delete();
+  changed();
+}
+
+/** Bytes of the scan's photos the server doesn't have yet. */
+export function bytesLeft(scan: Scan): number {
+  const done = new Set(scan.upload?.uploaded);
+  return scan.photos.filter((p) => !done.has(p.file)).reduce((sum, p) => sum + (photoFile(scan, p).size ?? 0), 0);
+}
+
+/** A scan's photo as a file, to read or upload. */
+export function photoFile(scan: Scan, photo: ScanPhoto): File {
+  return new File(scanFolder(scan.id), photo.file);
 }
 
 /** Starts a scan of a wall: its folder and a manifest with no photos yet. */
@@ -78,5 +150,5 @@ export async function savePhoto(
 
 /** Where a scan's photo is on the phone, to show it. */
 export function photoUri(scan: Scan, photo: ScanPhoto): string {
-  return new File(scanFolder(scan.id), photo.file).uri;
+  return photoFile(scan, photo).uri;
 }

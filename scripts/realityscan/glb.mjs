@@ -15,6 +15,15 @@ export function readGlb(file) {
   return { json, view };
 }
 
+// Triangles across every mesh, from the GLB's JSON.
+export function countTriangles(json) {
+  let triangles = 0;
+  for (const mesh of json.meshes) {
+    for (const prim of mesh.primitives) triangles += json.accessors[prim.indices ?? prim.attributes.POSITION].count / 3;
+  }
+  return Math.round(triangles);
+}
+
 // Writes json with every bufferView's bytes taken from views(i), packed in order.
 export function writeGlb(file, json, views) {
   const chunks = [];

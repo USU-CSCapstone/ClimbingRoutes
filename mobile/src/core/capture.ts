@@ -19,6 +19,16 @@ export const MANIFEST_FILE = 'scan.json';
 /** Still taking or reviewing photos, then uploading (#45). */
 export type ScanStatus = 'draft' | 'uploading';
 
+/** How far an upload has got, kept in the manifest so it carries on after a restart. */
+export interface ScanUpload {
+  /** The account that started it. Signed in as another, the upload starts over. */
+  userId: string;
+  /** The server's capture row. */
+  captureId: string;
+  /** Photos the server has confirmed. */
+  uploaded: string[];
+}
+
 /**
  * Which way the photos came in, picked on the scan's first screen: taken with
  * the guided camera (#51), or uploaded from photos taken outside the app (#52).
@@ -76,6 +86,8 @@ export interface Scan {
   plan: ScanPlan | null;
   /** In the order they were taken. */
   photos: ScanPhoto[];
+  /** Set once the upload has started. */
+  upload?: ScanUpload;
 }
 
 /**

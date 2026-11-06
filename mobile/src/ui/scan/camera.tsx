@@ -34,7 +34,18 @@ type Direction = 'right' | 'left';
  * and the phone buzzes once it's safe. The scan itself is made with the first
  * photo, so leaving before then leaves nothing behind.
  */
-export function GuidedCamera({ wallUuid, plan, onClose }: { wallUuid: Uuid; plan: ScanPlan; onClose: () => void }) {
+export function GuidedCamera({
+  wallUuid,
+  plan,
+  resume,
+  onClose,
+}: {
+  wallUuid: Uuid;
+  plan: ScanPlan;
+  /** An unfinished scan to add photos to, instead of starting a new one. */
+  resume?: Scan | null;
+  onClose: () => void;
+}) {
   const [camera, requestCamera] = useCameraPermissions();
   const [location, requestLocation] = Location.useForegroundPermissions();
   if (!camera || !location) return <View style={styles.page} />;
@@ -54,17 +65,19 @@ export function GuidedCamera({ wallUuid, plan, onClose }: { wallUuid: Uuid; plan
       />
     );
   }
-  return <Camera wallUuid={wallUuid} plan={plan} withLocation={location.granted} onClose={onClose} />;
+  return <Camera wallUuid={wallUuid} plan={plan} resume={resume} withLocation={location.granted} onClose={onClose} />;
 }
 
 function Camera({
   wallUuid,
   plan,
+  resume,
   withLocation,
   onClose,
 }: {
   wallUuid: Uuid;
   plan: ScanPlan;
+  resume?: Scan | null;
   withLocation: boolean;
   onClose: () => void;
 }) {
@@ -76,9 +89,9 @@ function Camera({
   const angle = useRef<PhotoAngle | null>(null);
   // What the next save builds on. A ref, so a second tap before the screen
   // re-renders can't start a second scan.
-  const saved = useRef<Scan | null>(null);
+  const saved = useRef<Scan | null>(resume ?? null);
   const shooting = useRef(false);
-  const [scan, setScan] = useState<Scan | null>(null);
+  const [scan, setScan] = useState<Scan | null>(resume ?? null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [direction, setDirection] = useState<Direction>('right');

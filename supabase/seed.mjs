@@ -11,7 +11,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { readGlb } from "../scripts/realityscan/glb.mjs";
+import { countTriangles, readGlb } from "../scripts/realityscan/glb.mjs";
 import { GLB_TYPE, must, signedIn } from "./lib.mjs";
 
 const REPO = fileURLToPath(new URL("../", import.meta.url));
@@ -45,7 +45,7 @@ const model = must(
       version,
       glb_path: glbPath,
       bytes: bytes.length,
-      triangles: countTriangles(modelFile),
+      triangles: countTriangles(readGlb(modelFile).json),
       review_note: `Seeded from ${saved.model}`,
     })
     .select()
@@ -60,9 +60,7 @@ try {
     cacheControl: "31536000",
     upsert: false,
   });
-  // Left by an earlier run that failed after uploading; it's the same file.
-  if (upload.error && /exists/i.test(upload.error.message)) console.log("Already uploaded by an earlier run.");
-  else must("upload the model", upload);
+  must("upload the model", upload);
   const lines = saved.routes.filter((r) => r.points.length >= 2);
   must(
     "add the route lines",
@@ -81,19 +79,8 @@ try {
   console.log(`Published ${saved.area.name} v${version}: ${model.triangles?.toLocaleString("en-US")} triangles, ${lines.length} route lines`);
   console.log(supabase.storage.from("models").getPublicUrl(glbPath).data.publicUrl);
 } catch (e) {
-  // Leave nothing half-made. A file already in models stays: it can't be removed through the API.
+  // Leave nothing half-made: the unpublished file and its row both go.
+  await supabase.storage.from("models").remove([glbPath]);
   await supabase.from("wall_models").delete().eq("id", model.id);
   throw e;
-}
-
-function countTriangles(file) {
-  const { json } = readGlb(file);
-  let triangles = 0;
-  for (const mesh of json.meshes) {
-    for (const prim of mesh.primitives) {
-      const accessor = json.accessors[prim.indices ?? prim.attributes.POSITION];
-      triangles += accessor.count / 3;
-    }
-  }
-  return Math.round(triangles);
 }

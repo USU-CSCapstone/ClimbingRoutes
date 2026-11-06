@@ -7,7 +7,8 @@
 //
 // Get the cameras with
 //   RealityScan -headless -load <proj.rsproj> -selectMaximalComponent -exportXMPForSelectedComponent -quit
-// which writes 00000.xmp... next to the photos (plus an undistorted PNG for each, which can be deleted).
+// which writes an .xmp per aligned photo next to the photos, named after the photo or numbered
+// 00000.xmp... (then with an undistorted PNG for each, which can be deleted). Any .xmp in the folder is read.
 //
 // Usage: node level.mjs <in.glb> <xmp folder> <out.glb>
 import fs from "fs";

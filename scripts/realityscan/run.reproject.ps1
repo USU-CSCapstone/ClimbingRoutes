@@ -70,9 +70,16 @@ if (-not $photos) { throw "No photos found in $Imgs" }
 $List = "$Proj\photos.imagelist"
 Write-Host "Photos: $($photos.Count)"
 
-# The XMP export writes 00000.xmp (and 00000.png) next to the photos, overwriting any already there.
-$camFile = '^\d{5}\.(xmp|png)$'
-$stale = Get-ChildItem $Imgs -File | Where-Object { $_.Name -match $camFile }
+# The XMP export writes one .xmp per aligned photo next to the photos, overwriting any already there.
+# It's named after the photo (photo-001.xmp), or numbered (00000.xmp, plus an undistorted 00000.png),
+# depending on the photos.
+$photoNames = @($photos | ForEach-Object { $_.BaseName })
+function Get-CameraFiles {
+  Get-ChildItem $Imgs -File | Where-Object {
+    $_.Name -match '^\d{5}\.(xmp|png)$' -or ($_.Extension -eq '.xmp' -and $photoNames -contains $_.BaseName)
+  }
+}
+$stale = @(Get-CameraFiles)
 if (-not $DryRun -and $stale) {
   throw "$Imgs already has $($stale.Count) exported camera files (e.g. $($stale[0].Name)). Move them out first."
 }
@@ -116,7 +123,7 @@ $camArgs = @("-headless", "-silent", "$Proj\crash", "-set", "appQuitOnError=true
 if ($DryRun) {
   Write-Host "`nWould run:`n`"$RS`" $($rsArgs -join ' ')"
   Write-Host "`"$RS`" $($camArgs -join ' ')"
-  Write-Host "Then move $Imgs\NNNNN.xmp to $Cams and delete $Imgs\NNNNN.png"
+  Write-Host "Then move the camera .xmp files from $Imgs to $Cams and delete any NNNNN.png"
   Write-Host "node `"$Finish`" `"$Raw`" `"$Png`""
   Write-Host "JPEG q$Quality of the *_diffuse.png -> $Jpg"
   Write-Host "node `"$Texture`" `"$Png`" `"$Jpg`" `"$Jpeg`""
@@ -140,7 +147,7 @@ if ($code -ne 0 -or -not (Test-Path $Raw)) {
 
 & $RS @camArgs | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "RealityScan's XMP export failed. Check $Proj\crash." }
-$exported = Get-ChildItem $Imgs -File | Where-Object { $_.Name -match $camFile }
+$exported = @(Get-CameraFiles)
 $xmps = @($exported | Where-Object Extension -eq ".xmp")
 New-Item -ItemType Directory -Force -Path $Cams | Out-Null
 $xmps | Move-Item -Destination $Cams
