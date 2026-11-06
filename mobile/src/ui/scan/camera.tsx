@@ -159,17 +159,25 @@ function Camera({
           style={({ pressed }) => [styles.barButton, pressed && styles.pressed]}>
           <AppText style={[styles.text, styles.bold]}>Close</AppText>
         </Pressable>
-        <AppText style={[styles.text, styles.bold, styles.count]}>
-          {taken === 0 ? `Aim for about ${plan.target} photos` : `Photo ${taken} of ~${plan.target}`}
-        </AppText>
+        <View style={styles.status}>
+          <AppText style={[styles.text, styles.bold]}>
+            {taken === 0 ? `Aim for about ${plan.target} photos` : `Photo ${taken} of ~${plan.target}`}
+          </AppText>
+          <Progress taken={taken} target={plan.target} />
+        </View>
         <View style={styles.barButton} />
       </View>
 
       <View style={[styles.preview, { width: (previewHeight * 3) / 4, height: previewHeight }]}>
+        {/* selectedLens pins the main lens. On iPhones whose ultra-wide focuses
+            closer, expo-camera otherwise opens Apple's combined back camera,
+            which switches to the ultra-wide for close-ups. It's iOS only: on
+            Android, zoom 0 is already the main lens at 1x. */}
         <CameraView
           ref={camera}
           style={StyleSheet.absoluteFill}
           facing="back"
+          selectedLens="AVCaptureDeviceTypeBuiltInWideAngleCamera"
           flash="off"
           zoom={0}
           ratio="4:3"
@@ -210,6 +218,27 @@ function Camera({
       </View>
     </View>
   );
+}
+
+/** The photos taken so far as a bar towards the target, turning from red through yellow to green as it fills. */
+function Progress({ taken, target }: { taken: number; target: number }) {
+  const done = Math.min(1, taken / target);
+  return (
+    <View
+      role="progressbar"
+      aria-label="Photos towards the target"
+      aria-valuemin={0}
+      aria-valuemax={target}
+      aria-valuenow={Math.min(taken, target)}
+      style={styles.track}>
+      <View style={[styles.fill, { width: `${done * 100}%`, backgroundColor: progressColor(done) }]} />
+    </View>
+  );
+}
+
+/** Red at the start, yellow halfway, green at the target: the hue runs from 0 to 120. */
+function progressColor(done: number): string {
+  return `hsl(${Math.round(Math.min(1, Math.max(0, done)) * 120)}, 90%, 50%)`;
 }
 
 /** Where to stand before the first photo, then which way to step. */
@@ -259,7 +288,9 @@ const styles = StyleSheet.create({
   access: { alignItems: 'center', justifyContent: 'center', gap: Spacing.three, paddingHorizontal: Spacing.four },
   bar: { height: TapTarget, flexDirection: 'row', alignItems: 'center' },
   barButton: { minWidth: 72, minHeight: TapTarget, justifyContent: 'center', paddingHorizontal: Spacing.three },
-  count: { flex: 1 },
+  status: { flex: 1, gap: Spacing.one },
+  track: { height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: 'rgba(255, 255, 255, 0.2)' },
+  fill: { height: '100%', borderRadius: 3 },
   text: { color: ON_DARK.text, textAlign: 'center' },
   bold: { fontWeight: '700' },
   muted: { color: ON_DARK.textSecondary },
