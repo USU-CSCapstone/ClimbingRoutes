@@ -31,10 +31,23 @@ type Direction = 'right' | 'left';
  * The guided camera (#51): the back 1x lens, flash and zoom off, counting
  * towards the scan's photo target and saying which way to step. Each photo is
  * saved straight into the scan, with the time, location and the phone's angle,
- * and the phone buzzes once it's safe. The scan itself is made with the first
- * photo, so leaving before then leaves nothing behind.
+ * and the phone buzzes once it's safe. A new scan is made with the first photo,
+ * so leaving before then leaves nothing behind. Done hands the scan to review.
  */
-export function GuidedCamera({ wallUuid, plan, onClose }: { wallUuid: Uuid; plan: ScanPlan; onClose: () => void }) {
+export function GuidedCamera({
+  wallUuid,
+  plan,
+  initial,
+  onClose,
+  onDone,
+}: {
+  wallUuid: Uuid;
+  plan: ScanPlan;
+  /** A scan to carry on with, for "Take more" in review. */
+  initial: Scan | null;
+  onClose: () => void;
+  onDone: (scan: Scan) => void;
+}) {
   const [camera, requestCamera] = useCameraPermissions();
   const [location, requestLocation] = Location.useForegroundPermissions();
   if (!camera || !location) return <View style={styles.page} />;
@@ -54,19 +67,32 @@ export function GuidedCamera({ wallUuid, plan, onClose }: { wallUuid: Uuid; plan
       />
     );
   }
-  return <Camera wallUuid={wallUuid} plan={plan} withLocation={location.granted} onClose={onClose} />;
+  return (
+    <Camera
+      wallUuid={wallUuid}
+      plan={plan}
+      initial={initial}
+      withLocation={location.granted}
+      onClose={onClose}
+      onDone={onDone}
+    />
+  );
 }
 
 function Camera({
   wallUuid,
   plan,
+  initial,
   withLocation,
   onClose,
+  onDone,
 }: {
   wallUuid: Uuid;
   plan: ScanPlan;
+  initial: Scan | null;
   withLocation: boolean;
   onClose: () => void;
+  onDone: (scan: Scan) => void;
 }) {
   const safe = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -76,9 +102,9 @@ function Camera({
   const angle = useRef<PhotoAngle | null>(null);
   // What the next save builds on. A ref, so a second tap before the screen
   // re-renders can't start a second scan.
-  const saved = useRef<Scan | null>(null);
+  const saved = useRef<Scan | null>(initial);
   const shooting = useRef(false);
-  const [scan, setScan] = useState<Scan | null>(null);
+  const [scan, setScan] = useState<Scan | null>(initial);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [direction, setDirection] = useState<Direction>('right');
@@ -214,7 +240,18 @@ function Camera({
           style={({ pressed }) => [styles.shutter, (!ready || busy) && styles.disabled, pressed && styles.pressed]}>
           <View style={styles.shutterInner} />
         </Pressable>
-        <View style={styles.flex} />
+        <View style={styles.doneArea}>
+          {scan && scan.photos.length > 0 ? (
+            <Pressable
+              role="button"
+              aria-label="Done, review the photos"
+              onPress={() => onDone(scan)}
+              disabled={busy}
+              style={({ pressed }) => [styles.done, busy && styles.disabled, pressed && styles.pressed]}>
+              <AppText style={[styles.text, styles.bold]}>Done</AppText>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -329,7 +366,14 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     paddingRight: Spacing.three,
   },
-  flex: { flex: 1 },
+  doneArea: { flex: 1, alignItems: 'flex-start', paddingLeft: Spacing.three },
+  done: {
+    minHeight: TapTarget,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.four,
+    borderRadius: TapTarget / 2,
+    backgroundColor: ON_DARK.backgroundElement,
+  },
   thumbnail: { width: THUMBNAIL, height: THUMBNAIL, borderRadius: 6, backgroundColor: ON_DARK.backgroundElement },
   shutter: {
     width: SHUTTER,
