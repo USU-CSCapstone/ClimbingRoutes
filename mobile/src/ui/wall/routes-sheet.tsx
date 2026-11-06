@@ -25,6 +25,7 @@ export function RoutesSheet({
   linesKnown,
   onSelect,
   onClose,
+  height,
 }: {
   wall: WallInfo;
   place: string | null;
@@ -35,11 +36,13 @@ export function RoutesSheet({
   onSelect: (uuid: Uuid) => void;
   /** Called once the sheet has slid away. */
   onClose: () => void;
+  /** How tall the sheet is, for a screen that doesn't fill the window. Most of the window by default. */
+  height?: number;
 }) {
   const theme = useTheme();
   const safe = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
-  const sheetHeight = Math.round(height * 0.8);
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetHeight = height ?? Math.round(windowHeight * 0.8);
   const [offset] = useState(() => new Animated.Value(sheetHeight));
   const latest = useRef({ sheetHeight, onClose });
   useEffect(() => {
