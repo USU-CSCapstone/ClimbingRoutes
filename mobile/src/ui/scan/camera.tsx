@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, TapTarget } from '@/constants/theme';
 import { angleFromGravity, type PhotoAngle, type PhotoLocation, type Scan, type ScanPlan } from '@/core/capture';
 import type { Uuid } from '@/core/types';
+import { overlapGuideOn, setOverlapGuideOn } from '@/data/overlap-guide';
 import { createScan, photoUri, savePhoto } from '@/data/scans';
 import { AppText } from '@/ui/text';
 
@@ -21,6 +22,8 @@ const QUALITY = 0.9;
 const THUMBNAILS = 3;
 const THUMBNAIL = 40;
 const SHUTTER = 76;
+/** How much of the frame the last photo covers in the overlap guide (#53), which is how much the next one shares. */
+const GHOST_OVERLAP = 1 / 3;
 /** Room below the preview for the thumbnails and the shutter. */
 const CONTROLS_HEIGHT = SHUTTER + Spacing.four * 2;
 const ON_DARK = Colors.dark;
@@ -109,6 +112,12 @@ function Camera({
   const [busy, setBusy] = useState(false);
   const [direction, setDirection] = useState<Direction>('right');
   const [error, setError] = useState<string | null>(null);
+  const [ghostOn, setGhostOn] = useState(overlapGuideOn);
+
+  function toggleGhost() {
+    setGhostOn(!ghostOn);
+    setOverlapGuideOn(!ghostOn);
+  }
 
   useEffect(() => {
     if (!withLocation) return;
@@ -173,6 +182,7 @@ function Camera({
     (window.width * 4) / 3,
     window.height - safe.top - safe.bottom - TapTarget - CONTROLS_HEIGHT,
   );
+  const previewWidth = (previewHeight * 3) / 4;
 
   return (
     <View style={[styles.page, { paddingTop: safe.top, paddingBottom: safe.bottom }]}>
@@ -191,10 +201,21 @@ function Camera({
           </AppText>
           <Progress taken={taken} target={plan.target} />
         </View>
-        <View style={styles.barButton} />
+        <Pressable
+          role="switch"
+          aria-checked={ghostOn}
+          aria-label="Overlay of the last photo"
+          onPress={toggleGhost}
+          hitSlop={12}
+          style={({ pressed }) => [styles.barButton, styles.toggle, pressed && styles.pressed]}>
+          <Ionicons name={ghostOn ? 'layers' : 'layers-outline'} size={22} color={ON_DARK.text} />
+          <AppText type="small" style={[styles.text, styles.toggleLabel, !ghostOn && styles.muted]}>
+            {ghostOn ? 'Overlay on' : 'Overlay off'}
+          </AppText>
+        </Pressable>
       </View>
 
-      <View style={[styles.preview, { width: (previewHeight * 3) / 4, height: previewHeight }]}>
+      <View style={[styles.preview, { width: previewWidth, height: previewHeight }]}>
         {/* selectedLens pins the main lens. On iPhones whose ultra-wide focuses
             closer, expo-camera otherwise opens Apple's combined back camera,
             which switches to the ultra-wide for close-ups. It's iOS only: on
@@ -209,6 +230,9 @@ function Camera({
           ratio="4:3"
           onCameraReady={() => setReady(true)}
         />
+        {ghostOn && latest.length > 0 ? (
+          <Ghost uri={latest[latest.length - 1].uri} width={previewWidth} height={previewHeight} direction={direction} />
+        ) : null}
         <View style={styles.prompt}>
           <View style={styles.pill}>
             <AppText style={[styles.text, error ? styles.error : styles.promptText]} numberOfLines={3}>
@@ -276,6 +300,28 @@ function Progress({ taken, target }: { taken: number; target: number }) {
 /** Red at the start, yellow halfway, green at the target: the hue runs from 0 to 120. */
 function progressColor(done: number): string {
   return `hsl(${Math.round(Math.min(1, Math.max(0, done)) * 120)}, 90%, 50%)`;
+}
+
+/**
+ * The overlap guide (#53): the last photo, half see-through, shifted so the
+ * part the next photo should share sits where it will land. Walking right, its
+ * right side lies over the left of the frame; walking left, the other way round.
+ * A line marks where it ends.
+ */
+function Ghost({ uri, width, height, direction }: { uri: string; width: number; height: number; direction: Direction }) {
+  const shift = width * (1 - GHOST_OVERLAP);
+  const edge = width * GHOST_OVERLAP;
+  return (
+    <View style={[StyleSheet.absoluteFill, styles.ghost]}>
+      <Image
+        source={{ uri }}
+        contentFit="cover"
+        transition={0}
+        style={[styles.ghostPhoto, { width, height, left: direction === 'right' ? -shift : shift }]}
+      />
+      <View style={[styles.ghostEdge, direction === 'right' ? { left: edge - 1 } : { right: edge - 1 }]} />
+    </View>
+  );
 }
 
 /** Where to stand before the first photo, then which way to step. */
@@ -351,6 +397,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   promptText: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
+  toggle: { alignItems: 'center', paddingHorizontal: Spacing.two },
+  toggleLabel: { fontSize: 11, lineHeight: 14 },
+  ghost: { pointerEvents: 'none' },
+  ghostPhoto: { position: 'absolute', top: 0, opacity: 0.5 },
+  ghostEdge: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: 'rgba(255, 255, 255, 0.7)' },
   flip: { width: TapTarget, paddingHorizontal: 0, alignItems: 'center' },
   controls: {
     flex: 1,
