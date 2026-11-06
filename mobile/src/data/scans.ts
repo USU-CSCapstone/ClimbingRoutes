@@ -1,28 +1,23 @@
 // Scans kept on the phone until they're uploaded: one folder each, holding the
-// photos and a scan.json manifest (src/core/capture.ts). The camera (#51)
-// writes them, the upload queue (#45) reads them, and screens list them with
-// useScans(). iOS and Android only: on the web, scans.web.ts has none, and
-// photos come from the computer instead (#52).
+// photos and a scan.json manifest (src/core/capture.ts). The camera (#51) and
+// the photo picker (#52) write them, review (#52) deletes photos from them, the
+// upload queue (#45) reads them, and screens list them with useScans(). iOS and
+// Android only: on the web, scans.web.ts keeps them in memory instead.
 import { Directory, File, Paths } from 'expo-file-system';
 import { useSyncExternalStore } from 'react';
 
 import {
   MANIFEST_FILE,
   MANIFEST_VERSION,
+  newScan,
   nextPhotoFile,
   type Scan,
   type ScanPhoto,
   type ScanPlan,
   type ScanSource,
+  type TakenPhoto,
 } from '@/core/capture';
 import type { Uuid } from '@/core/types';
-
-/** A photo as the camera hands it over, in a temporary file. */
-export interface TakenPhoto {
-  uri: string;
-  width: number;
-  height: number;
-}
 
 /** In documents rather than the cache, which the system can clear while a scan waits for Wi-Fi. */
 function scansRoot(): Directory {
@@ -111,34 +106,23 @@ export function photoFile(scan: Scan, photo: ScanPhoto): File {
 
 /** Starts a scan of a wall: its folder and a manifest with no photos yet. */
 export function createScan(wallUuid: Uuid, source: ScanSource, plan: ScanPlan | null): Scan {
-  const now = new Date();
-  const scan: Scan = {
-    version: MANIFEST_VERSION,
-    // Sorts by when it was started, with a random part in case two start at once.
-    id: `${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-    wallUuid,
-    status: 'draft',
-    source,
-    createdAt: now.toISOString(),
-    plan,
-    photos: [],
-  };
+  const scan = newScan(wallUuid, source, plan);
   scanFolder(scan.id).create({ intermediates: true });
   writeManifest(scan);
   return scan;
 }
 
 /**
- * Moves a photo the camera just took into the scan's folder and adds it to the
- * manifest, so it's kept if the app closes. Returns the scan with the photo
- * added. Save one photo at a time: each save builds on the scan the last returned.
+ * Moves a new photo into the scan's folder and adds it to the manifest, so it's
+ * kept if the app closes. Returns the scan with the photo added. Save one photo
+ * at a time: each save builds on the scan the last returned.
  */
 export async function savePhoto(
   scan: Scan,
   photo: TakenPhoto,
   details: Pick<ScanPhoto, 'takenAt' | 'location' | 'angle'>,
 ): Promise<Scan> {
-  const file = nextPhotoFile(scan.photos);
+  const file = nextPhotoFile(scan.photos, photo.extension);
   await new File(photo.uri).move(new File(scanFolder(scan.id), file));
   const saved: Scan = {
     ...scan,
@@ -146,6 +130,19 @@ export async function savePhoto(
   };
   writeManifest(saved);
   return saved;
+}
+
+/**
+ * Takes a photo out of the scan and deletes its file. The manifest is written
+ * first, so a crash in between leaves a stray file rather than a missing photo.
+ * Returns the scan without it.
+ */
+export function deletePhoto(scan: Scan, photo: ScanPhoto): Scan {
+  const kept: Scan = { ...scan, photos: scan.photos.filter((p) => p.file !== photo.file) };
+  writeManifest(kept);
+  const file = photoFile(scan, photo);
+  if (file.exists) file.delete();
+  return kept;
 }
 
 /** Where a scan's photo is on the phone, to show it. */

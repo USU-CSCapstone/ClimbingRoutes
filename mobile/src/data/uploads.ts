@@ -14,7 +14,7 @@ import * as Network from 'expo-network';
 import { useEffect, useSyncExternalStore } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import { MANIFEST_FILE, type Scan } from '@/core/capture';
+import { MANIFEST_FILE, photoMimeType, type Scan } from '@/core/capture';
 import { bytesLeft, deleteScan, listScans, photoFile, readScan, updateScan } from '@/data/scans';
 import { supabase } from '@/data/supabase';
 
@@ -173,7 +173,11 @@ async function upload(start: Scan) {
         total: scan.photos.length,
         bytes: bytesLeft(scan),
       });
-      const ok = await put(`${folder}/${photo.file}`, await photoFile(scan, photo).arrayBuffer(), 'image/jpeg');
+      const ok = await put(
+        `${folder}/${photo.file}`,
+        await photoFile(scan, photo).arrayBuffer(),
+        photoMimeType(photo.file),
+      );
       if (!ok) {
         // The capture is gone or past uploading, like after 14 days. Start a new one, once.
         if (restarted.has(scan.id)) throw new Error('The server refused the photos');

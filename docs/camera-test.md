@@ -13,6 +13,7 @@ What reading `expo-camera`'s code showed (SDK 57 and 58 behave the same), which 
 - **iOS re-encodes the photo.** It captures HEVC, decodes it and saves a plain JPEG at the `quality` given, so none of the HDR data that the camera app's photos carry survives. It also asks iOS for balanced rather than best photo quality, so the camera app may process its photos more.
 - **Photos are 12 MP.** `expo-camera` never raises the camera's maximum photo size. The camera app on an iPhone 16 takes 24 MP.
 - **No exposure, brightness or HDR settings on phones.** The exposure and brightness options in its types are web only.
+- **The default back camera isn't always the 1x lens on its own.** On iPhones whose ultra-wide focuses closer than the main lens, it's Apple's combined back camera set to 1x, which switches to the ultra-wide for close-ups. The guided camera (#51) pins the main lens with `selectedLens="AVCaptureDeviceTypeBuiltInWideAngleCamera"`. On Android, `zoom={0}` is a 1x zoom ratio, which is the main lens.
 
 ## Before shooting
 

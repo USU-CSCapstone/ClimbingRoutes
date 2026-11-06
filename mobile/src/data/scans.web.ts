@@ -1,22 +1,32 @@
-// The web has no camera or scan storage: photos are picked from the computer
-// instead (#52). Same functions as scans.ts, with no scans, so shared screens
-// and the upload queue work unchanged.
-import type { Scan, ScanPhoto, ScanPlan, ScanSource } from '@/core/capture';
+// Scans on the web, kept in memory with the same functions as scans.ts. A
+// browser has no folder to keep them in, so a scan lasts as long as the page.
+// Only the upload lane runs on the web, with photos picked from the computer
+// (#52), and each photo stays a blob URL for its file. The upload queue (#45)
+// doesn't run on the web yet, so listing finds no scans and they can't be sent:
+// the wall's scan card and the queue leave the web alone.
+import { newScan, nextPhotoFile, type Scan, type ScanPhoto, type ScanPlan, type ScanSource, type TakenPhoto } from '@/core/capture';
 import type { Uuid } from '@/core/types';
 
-export interface TakenPhoto {
-  uri: string;
-  width: number;
-  height: number;
-}
-
-const NOT_ON_WEB = 'Scans are taken in the phone app';
+const NOT_ON_WEB = "Scans can't be uploaded from the web yet";
 const NO_SCANS: Scan[] = [];
 
-export function updateScan(_scan: Scan) {}
+const scans = new Map<string, Scan>();
+/** Blob URLs by scan id, then file name. */
+const uris = new Map<string, Map<string, string>>();
 
-export function readScan(_id: string): Scan | null {
-  return null;
+export function createScan(wallUuid: Uuid, source: ScanSource, plan: ScanPlan | null): Scan {
+  const scan = newScan(wallUuid, source, plan);
+  scans.set(scan.id, scan);
+  uris.set(scan.id, new Map());
+  return scan;
+}
+
+export function readScan(id: string): Scan | null {
+  return scans.get(id) ?? null;
+}
+
+export function updateScan(scan: Scan) {
+  if (scans.has(scan.id)) scans.set(scan.id, scan);
 }
 
 export function listScans(): Scan[] {
@@ -27,24 +37,44 @@ export function useScans(): Scan[] {
   return NO_SCANS;
 }
 
-export function deleteScan(_id: string) {}
+export async function savePhoto(
+  scan: Scan,
+  photo: TakenPhoto,
+  details: Pick<ScanPhoto, 'takenAt' | 'location' | 'angle'>,
+): Promise<Scan> {
+  const file = nextPhotoFile(scan.photos, photo.extension);
+  uris.get(scan.id)?.set(file, photo.uri);
+  const saved: Scan = {
+    ...scan,
+    photos: [...scan.photos, { file, width: photo.width, height: photo.height, ...details }],
+  };
+  scans.set(scan.id, saved);
+  return saved;
+}
+
+export function deletePhoto(scan: Scan, photo: ScanPhoto): Scan {
+  const kept: Scan = { ...scan, photos: scan.photos.filter((p) => p.file !== photo.file) };
+  scans.set(scan.id, kept);
+  const uri = uris.get(scan.id)?.get(photo.file);
+  if (uri) URL.revokeObjectURL(uri);
+  uris.get(scan.id)?.delete(photo.file);
+  return kept;
+}
+
+export function deleteScan(id: string) {
+  for (const uri of uris.get(id)?.values() ?? []) URL.revokeObjectURL(uri);
+  uris.delete(id);
+  scans.delete(id);
+}
+
+export function photoUri(scan: Scan, photo: ScanPhoto): string {
+  return uris.get(scan.id)?.get(photo.file) ?? '';
+}
 
 export function bytesLeft(_scan: Scan): number {
   return 0;
 }
 
 export function photoFile(_scan: Scan, _photo: ScanPhoto): never {
-  throw new Error(NOT_ON_WEB);
-}
-
-export function createScan(_wallUuid: Uuid, _source: ScanSource, _plan: ScanPlan | null): Scan {
-  throw new Error(NOT_ON_WEB);
-}
-
-export async function savePhoto(): Promise<Scan> {
-  throw new Error(NOT_ON_WEB);
-}
-
-export function photoUri(_scan: Scan, _photo: ScanPhoto): string {
   throw new Error(NOT_ON_WEB);
 }
