@@ -12,7 +12,7 @@ type IconName = ComponentProps<typeof Ionicons>['name'];
 /** A screen of the scan flow for a wall: /scan/<wall>, or /scan/<wall>/<step>, with any search params. */
 export function scanHref(
   wall: string,
-  step?: 'guide' | 'prepare' | 'camera' | 'upload',
+  step?: 'guide' | 'prepare' | 'camera' | 'upload' | 'review',
   params?: Record<string, string>,
 ): Href {
   const pathname = step ? `/scan/${wall}/${step}` : `/scan/${wall}`;

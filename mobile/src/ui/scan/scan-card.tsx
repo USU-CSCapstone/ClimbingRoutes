@@ -3,7 +3,7 @@ import { type Href, router } from 'expo-router';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import { MIN_PHOTOS } from '@/core/scan-plan';
+import { minimumPhotos } from '@/core/scan-plan';
 import type { AreaSummary, Uuid } from '@/core/types';
 import { usePublishedWalls } from '@/data/models';
 import { deleteScan, useScans } from '@/data/scans';
@@ -45,19 +45,21 @@ export function ScanCard({ wallUuid }: { wallUuid: Uuid }) {
     );
   } else if (scan) {
     const count = scan.photos.length;
-    const enough = count >= MIN_PHOTOS;
+    const minimum = minimumPhotos(scan.plan?.wallSize);
+    const enough = count >= minimum;
     const upload = () =>
       hasUploadConsent() ? startUpload(scan.id) : router.push(`/scan/consent?scan=${scan.id}` as Href);
     body = (
       <>
         <AppText color="textSecondary">
           {`You have an unfinished scan of this wall, with ${count} ${count === 1 ? 'photo' : 'photos'}.`}
-          {enough ? '' : ` Uploading needs at least ${MIN_PHOTOS}.`}
+          {enough ? '' : ` Uploading needs at least ${minimum}.`}
         </AppText>
         <ActionButton
           icon="play"
           label="Resume scan"
-          onPress={() => router.push(scanHref(wallUuid, scan.source === 'upload' ? 'upload' : 'camera', { scan: scan.id }))}
+          // Picked photos carry on in review, whose Add more reopens the picker.
+          onPress={() => router.push(scanHref(wallUuid, scan.source === 'upload' ? 'review' : 'camera', { scan: scan.id }))}
           primary={!enough}
         />
         <ActionButton icon="cloud-upload-outline" label={`Upload ${count} photos`} onPress={upload} primary={enough} disabled={!enough} />

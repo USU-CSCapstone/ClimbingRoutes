@@ -1,7 +1,7 @@
 // A scan on the phone: one wall's photos and what was known when each was taken.
 // The camera (#51) and the photo picker (#52) write scans and the upload queue
-// (#45) reads them, so these types are the handoff between them. Drafted for #51;
-// #44 owns them, along with listing unfinished scans and deleting a scan's files.
+// (#45) reads them, so these types are the handoff between them. The scan
+// storage that keeps them is src/data/scans.ts (#44).
 //
 // Each scan is a folder on the phone holding its photos and a scan.json
 // manifest, which is a Scan as JSON. Photos are only kept until upload is
@@ -60,15 +60,33 @@ export interface PhotoAngle {
   roll: number;
 }
 
+/**
+ * One photo in a scan. Photos picked from the library (#52) are kept exactly as
+ * they were, so their own EXIF has their time and place, and these fields are
+ * null for them.
+ */
 export interface ScanPhoto {
-  /** File name in the scan's folder, like photo-001.jpg. */
+  /** File name in the scan's folder, like photo-001.jpg or photo-002.heic. */
   file: string;
   /** ISO time the shutter was pressed. */
-  takenAt: string;
+  takenAt: string | null;
+  /** 0 for a picked photo the browser can't open, like a HEIC in Chrome. */
   width: number;
   height: number;
   location: PhotoLocation | null;
   angle: PhotoAngle | null;
+}
+
+/** The file types the team's pipeline takes, the same ones the captures bucket allows. */
+export type PhotoExtension = 'jpg' | 'heic' | 'heif';
+
+/** A new photo as the camera or the photo picker hands it over, in a temporary file. */
+export interface TakenPhoto {
+  uri: string;
+  width: number;
+  height: number;
+  /** jpg if missing: the in-app camera only takes JPEGs. */
+  extension?: PhotoExtension;
 }
 
 /** A scan, and the format of its scan.json manifest. */
@@ -90,14 +108,53 @@ export interface Scan {
   upload?: ScanUpload;
 }
 
+/** A new scan of a wall with no photos yet, for the scan storage to keep. */
+export function newScan(wallUuid: Uuid, source: ScanSource, plan: ScanPlan | null): Scan {
+  const now = new Date();
+  return {
+    version: MANIFEST_VERSION,
+    // Sorts by when it was started, with a random part in case two start at once.
+    id: `${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    wallUuid,
+    status: 'draft',
+    source,
+    createdAt: now.toISOString(),
+    plan,
+    photos: [],
+  };
+}
+
 /**
- * The next photo's file name: photo-001.jpg, photo-002.jpg and so on, so the
- * files sort in the order they were taken. Numbered past the highest so far, so
+ * The next photo's file name: photo-001.jpg, photo-002.heic and so on, so the
+ * files sort in the order they were added. Numbered past the highest so far, so
  * a photo deleted in review (#52) never has its name reused.
  */
-export function nextPhotoFile(photos: Pick<ScanPhoto, 'file'>[]): string {
+export function nextPhotoFile(photos: Pick<ScanPhoto, 'file'>[], extension: PhotoExtension = 'jpg'): string {
   const last = Math.max(0, ...photos.map((p) => Number(/\d+/.exec(p.file)?.[0] ?? 0)));
-  return `photo-${String(last + 1).padStart(3, '0')}.jpg`;
+  return `photo-${String(last + 1).padStart(3, '0')}.${extension}`;
+}
+
+/** A scan photo's MIME type, from its file name, to upload it with. */
+export function photoMimeType(file: string): string {
+  if (file.endsWith('.heic')) return 'image/heic';
+  if (file.endsWith('.heif')) return 'image/heif';
+  return 'image/jpeg';
+}
+
+/**
+ * A picked file's type, from its MIME type or else its name, or null for one
+ * the pipeline can't take, like a PNG screenshot. Browsers often leave HEIC's
+ * MIME type blank, hence the name.
+ */
+export function photoExtension(mimeType?: string | null, fileName?: string | null): PhotoExtension | null {
+  const type = mimeType?.toLowerCase();
+  if (type === 'image/jpeg') return 'jpg';
+  if (type === 'image/heic') return 'heic';
+  if (type === 'image/heif') return 'heif';
+  const ending = fileName?.split('.').pop()?.toLowerCase();
+  if (ending === 'jpg' || ending === 'jpeg') return 'jpg';
+  if (ending === 'heic' || ending === 'heif') return ending;
+  return null;
 }
 
 /**
