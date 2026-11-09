@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { WallModel } from '@/core/database';
+import { modelUrl } from '@/core/models';
 import { supabase } from '@/data/supabase';
 
 /** Models waiting for review, newest first. */
@@ -34,5 +35,29 @@ export function useWallModel(id: string) {
       return data;
     },
     staleTime: 0,
+  });
+}
+
+/** Signed links to unpublished files last this long, longer than a review takes. */
+const SIGNED_SECONDS = 60 * 60;
+
+/**
+ * Where to load the model's file from: a signed link into the private review
+ * bucket while it waits, or its public URL once published. Null once rejected,
+ * when the file is removed.
+ */
+export function useModelFileUrl(model: WallModel) {
+  return useQuery({
+    queryKey: ['model-file-url', model.id, model.status],
+    queryFn: async (): Promise<string | null> => {
+      if (model.status === 'published') return modelUrl(model.glb_path);
+      if (model.status === 'rejected') return null;
+      const { data, error } = await supabase.storage.from('review').createSignedUrl(model.glb_path, SIGNED_SECONDS);
+      if (error) throw new Error(`Couldn't open the model file: ${error.message}`);
+      return data.signedUrl;
+    },
+    // The viewer reloads whenever the URL changes, so keep the first link. It's only read when the
+    // model loads; after an hour, retrying the load fetches a new one.
+    staleTime: Infinity,
   });
 }

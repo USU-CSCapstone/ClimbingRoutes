@@ -23,6 +23,12 @@ import type { ShownRoute } from '@/ui/wall/types';
 export const OnModel = { background: 'rgba(15, 16, 19, 0.78)', text: Colors.dark.text, muted: Colors.dark.textSecondary };
 
 /** The route's number on the wall: filled in its line color once drawn, dashed until then. */
+/** Lines are drawn in their difficulty's color, or white when the grade has no band. */
+export function lineColor(grade: Grade | null): string {
+  const band = difficultyBand(grade);
+  return band == null ? UngradedLine : Difficulty[band].line;
+}
+
 export function NumberBadge({
   route,
   linesKnown,

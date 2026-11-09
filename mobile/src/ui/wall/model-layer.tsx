@@ -3,11 +3,10 @@ import { lazy, Suspense } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Colors, Spacing } from '@/constants/theme';
-import { modelUrl, type PublishedModel } from '@/core/models';
 import type { Uuid } from '@/core/types';
 import { DOM_WEBVIEW } from '@/ui/dom';
 import { AppText } from '@/ui/text';
-import type { Insets, ModelInfo, ViewerRoute } from '@/viewer/types';
+import type { Insets, ModelCacheKey, ModelInfo, ViewerRoute } from '@/viewer/types';
 
 // Loaded on demand so three.js stays out of the app's main web bundle.
 const WallViewer = lazy(() => import('@/viewer/wall-viewer'));
@@ -25,7 +24,8 @@ export interface ModelStatus {
 
 /** The 3D model behind everything else on the Wall page, with its loading and error states. */
 export function ModelLayer({
-  model,
+  url,
+  cache,
   lines,
   highlighted,
   insets,
@@ -39,7 +39,10 @@ export function ModelLayer({
   onEmptyTap,
   onFps,
 }: {
-  model: PublishedModel;
+  /** The model file's URL. */
+  url: string;
+  /** Keep the file on the device under this key, for versions that never change. */
+  cache?: ModelCacheKey;
   lines: ViewerRoute[];
   highlighted: Uuid | null;
   insets: Insets;
@@ -65,8 +68,8 @@ export function ModelLayer({
       <Suspense fallback={null}>
         <WallViewer
           key={status.attempt}
-          model={modelUrl(model.glbPath)}
-          cache={{ key: model.glbPath, group: model.wallUuid }}
+          model={url}
+          cache={cache}
           routes={lines}
           highlighted={highlighted}
           insets={insets}
