@@ -1,9 +1,9 @@
 // What the moderator reviews: models the team PC made, waiting in the review
 // bucket. Row-level security only shows them to the moderator account.
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { WallModel } from '@/core/database';
-import { modelUrl } from '@/core/models';
+import { type DrawnLine, modelUrl, type Vec3 } from '@/core/models';
 import { supabase } from '@/data/supabase';
 
 /** Models waiting for review, newest first. */
@@ -60,4 +60,47 @@ export function useModelFileUrl(model: WallModel) {
     // model loads; after an hour, retrying the load fetches a new one.
     staleTime: Infinity,
   });
+}
+
+/**
+ * Saves one route's line on a model version, replacing any saved before. It
+ * updates or inserts rather than upserting, because an upsert would also need
+ * permission to change the row's model and route, which nobody has.
+ */
+export function useSaveRouteLine(modelId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (line: DrawnLine) => {
+      const values = { name: line.name, grade: line.grade, points: round(line.points), normals: round(line.normals) };
+      const { data: existing, error: findError } = await supabase
+        .from('route_lines')
+        .select('id')
+        .eq('wall_model_id', modelId)
+        .eq('climb_uuid', line.climbUuid)
+        .maybeSingle();
+      if (findError) throw new Error(`Couldn't save the line: ${findError.message}`);
+      const { error } = existing
+        ? await supabase.from('route_lines').update(values).eq('id', existing.id)
+        : await supabase.from('route_lines').insert({ wall_model_id: modelId, climb_uuid: line.climbUuid, ...values });
+      if (error) throw new Error(`Couldn't save the line: ${error.message}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['route-lines', modelId] }),
+  });
+}
+
+/** Deletes one route's saved line from a model version. */
+export function useDeleteRouteLine(modelId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (climbUuid: string) => {
+      const { error } = await supabase.from('route_lines').delete().eq('wall_model_id', modelId).eq('climb_uuid', climbUuid);
+      if (error) throw new Error(`Couldn't delete the line: ${error.message}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['route-lines', modelId] }),
+  });
+}
+
+/** To 4 decimals, as the author tool saved them. */
+function round(list: Vec3[]): Vec3[] {
+  return list.map((v) => v.map((n) => Math.round(n * 1e4) / 1e4) as Vec3);
 }

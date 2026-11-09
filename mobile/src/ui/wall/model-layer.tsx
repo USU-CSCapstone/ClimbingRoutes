@@ -6,7 +6,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import type { Uuid } from '@/core/types';
 import { DOM_WEBVIEW } from '@/ui/dom';
 import { AppText } from '@/ui/text';
-import type { Insets, ModelCacheKey, ModelInfo, ViewerRoute } from '@/viewer/types';
+import type { Insets, ModelCacheKey, ModelInfo, SurfaceHit, ViewerRoute } from '@/viewer/types';
 
 // Loaded on demand so three.js stays out of the app's main web bundle.
 const WallViewer = lazy(() => import('@/viewer/wall-viewer'));
@@ -37,6 +37,10 @@ export function ModelLayer({
   onRetry,
   onRouteTap,
   onEmptyTap,
+  onSurfaceTap,
+  dimOthers,
+  showPoints,
+  flyToHighlight,
   onFps,
 }: {
   /** The model file's URL. */
@@ -54,6 +58,11 @@ export function ModelLayer({
   onRetry: () => void;
   onRouteTap: (uuid: Uuid) => void;
   onEmptyTap: () => void;
+  /** For drawing: every tap, with the point on the rock under it. */
+  onSurfaceTap?: (hit: SurfaceHit | null) => void;
+  dimOthers?: boolean;
+  showPoints?: boolean;
+  flyToHighlight?: boolean;
   onFps?: (fps: number) => void;
 }) {
   // Messages sit in the middle of the area the page's controls leave uncovered.
@@ -79,6 +88,10 @@ export function ModelLayer({
           onError={onError}
           onRouteTap={onRouteTap}
           onEmptyTap={onEmptyTap}
+          onSurfaceTap={onSurfaceTap}
+          dimOthers={dimOthers}
+          showPoints={showPoints}
+          flyToHighlight={flyToHighlight}
           onFps={onFps}
           dom={{ ...DOM_WEBVIEW, style: styles.fill, scrollEnabled: false }}
         />
