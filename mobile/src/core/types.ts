@@ -66,6 +66,8 @@ export interface MapNode {
 /** What the map needs to split an area into its children. */
 export interface MapArea {
   uuid: Uuid;
+  /** Ancestors from the country down to the parent, for its panel's place line. */
+  path: Crumb[];
   bbox: BBox | null;
   children: MapNode[];
 }

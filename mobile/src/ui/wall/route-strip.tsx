@@ -41,15 +41,18 @@ export function RouteStrip({
   index,
   linesKnown,
   onSelect,
+  onOpen,
 }: {
   routes: ShownRoute[];
   /** The selected route's place in `routes`, or -1. */
   index: number;
   linesKnown: boolean;
   onSelect: (uuid: Uuid | null) => void;
+  /** Adds a link to each card's route page. */
+  onOpen?: (uuid: Uuid) => void;
 }) {
   if (index < 0) return <RoutePills routes={routes} linesKnown={linesKnown} onSelect={onSelect} />;
-  return <RouteCards routes={routes} index={index} linesKnown={linesKnown} onSelect={onSelect} />;
+  return <RouteCards routes={routes} index={index} linesKnown={linesKnown} onSelect={onSelect} onOpen={onOpen} />;
 }
 
 function RoutePills({
@@ -91,11 +94,13 @@ function RouteCards({
   index,
   linesKnown,
   onSelect,
+  onOpen,
 }: {
   routes: ShownRoute[];
   index: number;
   linesKnown: boolean;
   onSelect: (uuid: Uuid | null) => void;
+  onOpen?: (uuid: Uuid) => void;
 }) {
   const { width } = useWindowDimensions();
   const cardWidth = Math.min(width - 2 * SIDE - PEEK, 420);
@@ -162,6 +167,7 @@ function RouteCards({
             onPrevious={() => onSelect(routes[i - 1]?.uuid ?? item.uuid)}
             onNext={() => onSelect(routes[i + 1]?.uuid ?? item.uuid)}
             onClose={() => onSelect(null)}
+            onOpen={onOpen && (() => onOpen(item.uuid))}
             style={{ width: cardWidth }}
           />
         </View>

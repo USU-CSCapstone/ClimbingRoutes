@@ -9,26 +9,29 @@ import { useTheme } from '@/hooks/use-theme';
 import { useHrefs } from '@/ui/nav';
 import { AppText } from '@/ui/text';
 
-/** A full-width tappable list row. */
+/** A full-width tappable list row that opens `href`, or runs `onPress` instead. */
 export function LinkRow({
   href,
+  onPress,
   leading,
   title,
   subtitle,
   trailing,
-}: {
-  href: Href;
+  accessibilityLabel,
+}: ({ href: Href; onPress?: never } | { onPress: () => void; href?: never }) & {
   leading?: ReactNode;
   title: string;
   subtitle?: string;
   trailing?: ReactNode;
+  accessibilityLabel?: string;
 }) {
   const theme = useTheme();
   return (
     // A plain Pressable rather than <Link asChild>: on web the link wrapper drops the row's layout.
     <Pressable
-      role="link"
-      onPress={() => router.push(href)}
+      role={href ? 'link' : 'button'}
+      accessibilityLabel={accessibilityLabel}
+      onPress={href ? () => router.push(href) : onPress}
       style={({ pressed }) => [
         styles.row,
         { borderBottomColor: theme.border },
@@ -86,8 +89,13 @@ const DISCIPLINE_LABELS: Record<Discipline, string> = {
   snow: 'Snow',
 };
 
+/** A count with its noun, like "1 wall" or "1,204 walls". */
+export function count(n: number, noun: string): string {
+  return `${n.toLocaleString()} ${noun}${n === 1 ? '' : 's'}`;
+}
+
 export function climbCount(n: number): string {
-  return n === 1 ? '1 route' : `${n.toLocaleString()} routes`;
+  return count(n, 'route');
 }
 
 export function disciplineText(disciplines: Discipline[]): string {
@@ -115,15 +123,34 @@ export function Breadcrumb({ path }: { path: Crumb[] }) {
 }
 
 /** Opens a wall's 3D model, with one of its routes selected if given. */
-export function WallLink({ wallUuid, route, label }: { wallUuid: Uuid; route?: Uuid; label: string }) {
+export function WallLink({
+  wallUuid,
+  route,
+  label,
+  accessibilityLabel,
+  compact,
+}: {
+  wallUuid: Uuid;
+  route?: Uuid;
+  label: string;
+  accessibilityLabel?: string;
+  /** A small pill for a bar, rather than a full-width button. */
+  compact?: boolean;
+}) {
   const theme = useTheme();
   const href = (route ? `/walls/${wallUuid}?route=${route}` : `/walls/${wallUuid}`) as Href;
   return (
     <Pressable
       role="link"
+      accessibilityLabel={accessibilityLabel}
       onPress={() => router.push(href)}
-      style={({ pressed }) => [styles.wallLink, { backgroundColor: theme.accent }, pressed && styles.pressed]}>
-      <Ionicons name="cube-outline" size={22} color={theme.accentText} />
+      style={({ pressed }) => [
+        styles.wallLink,
+        compact && styles.wallLinkCompact,
+        { backgroundColor: theme.accent },
+        pressed && styles.pressed,
+      ]}>
+      <Ionicons name="cube-outline" size={compact ? 18 : 22} color={theme.accentText} />
       <AppText style={[styles.wallLinkText, { color: theme.accentText }]}>{label}</AppText>
     </Pressable>
   );
@@ -204,6 +231,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     borderRadius: 12,
   },
+  wallLinkCompact: { minHeight: 40, paddingHorizontal: Spacing.three, borderRadius: 20 },
   wallLinkText: { fontWeight: '700' },
   pressed: { opacity: 0.8 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four, gap: Spacing.two },
