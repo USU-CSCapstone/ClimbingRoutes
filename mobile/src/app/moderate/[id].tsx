@@ -12,6 +12,7 @@ import { useArea } from '@/data/queries';
 import { useDeleteRouteLine, useModelFileUrl, useSaveRouteLine, useWallModel } from '@/data/review';
 import { useTheme } from '@/hooks/use-theme';
 import { Loading, Message } from '@/ui/components';
+import { DecisionPanel } from '@/ui/review/decision-panel';
 import { DrawPanel } from '@/ui/review/draw-panel';
 import { modelSummary } from '@/ui/review/model-summary';
 import { AppText } from '@/ui/text';
@@ -226,6 +227,16 @@ function Review({ model }: { model: WallModel }) {
                   <AppText color="textSecondary">{modelSummary(model)}</AppText>
                   <AppText style={styles.status}>{STATUS[model.status]}</AppText>
                   {model.review_note ? <AppText color="textSecondary">{model.review_note}</AppText> : null}
+                  {model.status === 'needs_review' ? (
+                    <DecisionPanel
+                      model={model}
+                      name={name}
+                      drawn={saved.data?.length ?? 0}
+                      total={routes.length}
+                      unsaved={unsaved}
+                      ready={area.data != null && linesKnown}
+                    />
+                  ) : null}
                   <AppText type="label" color="textSecondary" style={styles.label}>
                     {routesMessage}
                   </AppText>

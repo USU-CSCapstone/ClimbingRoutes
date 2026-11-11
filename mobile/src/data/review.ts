@@ -100,6 +100,64 @@ export function useDeleteRouteLine(modelId: string) {
   });
 }
 
+/** After a decision, everything that lists or shows models is out of date. */
+function refreshModels(queryClient: ReturnType<typeof useQueryClient>, model: WallModel) {
+  for (const queryKey of [
+    ['review-queue'],
+    ['wall-model', model.id],
+    ['model-file-url', model.id],
+    ['published-walls'],
+    ['latest-model', model.wall_uuid],
+  ]) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
+}
+
+/**
+ * Publishes a model: copies its file from the private review bucket to the
+ * public models bucket, then marks it published, which the database only
+ * allows once the file is there. If publishing fails, the copy is removed, so
+ * an unapproved file never stays public. The review copy goes last, to free
+ * storage. The app shows the new version within a few minutes.
+ */
+export function useApproveModel(model: WallModel) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const copied = await supabase.storage
+        .from('review')
+        .copy(model.glb_path, model.glb_path, { destinationBucket: 'models' });
+      // Already there from an approval that failed after copying: it's the same file.
+      if (copied.error && !/exists/i.test(copied.error.message)) {
+        throw new Error(`Couldn't copy the model to the public bucket: ${copied.error.message}`);
+      }
+      const { error } = await supabase.from('wall_models').update({ status: 'published' }).eq('id', model.id);
+      if (error) {
+        await supabase.storage.from('models').remove([model.glb_path]);
+        throw new Error(`Couldn't publish the model: ${error.message}`);
+      }
+      await supabase.storage.from('review').remove([model.glb_path]);
+    },
+    onSettled: () => refreshModels(queryClient, model),
+  });
+}
+
+/** Rejects a model with a note for the team, and removes its file from the review bucket. */
+export function useRejectModel(model: WallModel) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (note: string) => {
+      const { error } = await supabase
+        .from('wall_models')
+        .update({ status: 'rejected', review_note: note.trim() || null })
+        .eq('id', model.id);
+      if (error) throw new Error(`Couldn't reject the model: ${error.message}`);
+      await supabase.storage.from('review').remove([model.glb_path]);
+    },
+    onSettled: () => refreshModels(queryClient, model),
+  });
+}
+
 /** To 4 decimals, as the author tool saved them. */
 function round(list: Vec3[]): Vec3[] {
   return list.map((v) => v.map((n) => Math.round(n * 1e4) / 1e4) as Vec3);

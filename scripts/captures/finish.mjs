@@ -72,7 +72,12 @@ async function finish(id, modelArg) {
   const glbPath = `${capture.wall_uuid}/v${version}.glb`;
   must(
     "upload the model to review",
-    await supabase.storage.from("review").upload(glbPath, fs.readFileSync(model), { contentType: "model/gltf-binary", upsert: true }),
+    await supabase.storage.from("review").upload(glbPath, fs.readFileSync(model), {
+      contentType: "model/gltf-binary",
+      // Approving copies the file as is, and a published version never changes.
+      cacheControl: "31536000",
+      upsert: true,
+    }),
   );
   const added = await supabase
     .from("wall_models")
