@@ -62,7 +62,6 @@ export function WallView({
   const area = useArea(wall.uuid);
   const saved = useRouteLines(model.id);
   const [status, setStatus] = useState<ModelStatus>({ attempt: 0, percent: null, info: null, error: null });
-  const [fps, setFps] = useState<number | null>(null);
   const [wholeWall, setWholeWall] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -114,14 +113,6 @@ export function WallView({
     saved.refetch();
   }
 
-  const devStats =
-    __DEV__ && status.info ? (
-      <View style={styles.glassChip}>
-        <AppText type="small" style={styles.onModel}>
-          {fps ?? '–'} fps · {(status.info.loadMs / 1000).toFixed(1)} s
-        </AppText>
-      </View>
-    ) : null;
   const noticeChip = notice ? (
     <View style={styles.glassChip}>
       <AppText type="small" numberOfLines={1} style={styles.onModel}>
@@ -133,7 +124,8 @@ export function WallView({
 
   return (
     <View style={styles.page}>
-      <Stack.Screen options={{ title: wall.name }} />
+      {/* No swipe back: dragging to turn the model kept starting iOS's back gesture. The Back button leaves. */}
+      <Stack.Screen options={{ title: wall.name, gestureEnabled: false }} />
       <StatusBar style="light" />
       <ModelLayer
         model={model}
@@ -148,7 +140,6 @@ export function WallView({
         onRetry={retry}
         onRouteTap={toggle}
         onEmptyTap={() => onSelect(null)}
-        onFps={__DEV__ ? setFps : undefined}
       />
 
       {wide ? (
@@ -179,7 +170,6 @@ export function WallView({
             />
           </View>
           <View style={styles.wideTools}>
-            {devStats}
             <GlassButton icon="scan-outline" label="Whole wall" onPress={showWholeWall} />
           </View>
           {noticeChip ? (
@@ -219,14 +209,6 @@ export function WallView({
               ) : null}
             </View>
             <RoundButton icon="scan-outline" label="Show the whole wall" onPress={showWholeWall} onModel />
-          </View>
-          <View
-            style={[
-              styles.phoneTop,
-              { top: safe.top + MARGIN + TITLE_HEIGHT + Spacing.two, left: safe.left + MARGIN, right: safe.right + MARGIN },
-            ]}>
-            <View style={styles.flex}>{selectedRoute ? null : <FactChips facts={facts} onModel />}</View>
-            {devStats}
           </View>
           <View style={[styles.phoneBottom, { bottom: safe.bottom + MARGIN }]}>
             <View style={[styles.buttonRow, { paddingLeft: safe.left + MARGIN, paddingRight: safe.right + MARGIN }]}>
@@ -291,7 +273,6 @@ const styles = StyleSheet.create({
   },
   titleName: { color: OnModel.text, fontSize: 20, lineHeight: 24 },
   titlePlace: { color: OnModel.muted },
-  phoneTop: { position: 'absolute', flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
   phoneBottom: { position: 'absolute', left: 0, right: 0, gap: Spacing.two },
   buttonRow: { height: BUTTON_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   panel: {

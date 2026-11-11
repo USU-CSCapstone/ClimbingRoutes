@@ -92,17 +92,13 @@ export function wallFacts(routes: ShownRoute[], linesKnown: boolean): string[] {
   return facts;
 }
 
-export function FactChips({ facts, onModel }: { facts: string[]; onModel?: boolean }) {
+export function FactChips({ facts }: { facts: string[] }) {
   const theme = useTheme();
   return (
     <View style={styles.chips}>
       {facts.map((fact) => (
-        <View
-          key={fact}
-          style={[styles.chip, { backgroundColor: onModel ? OnModel.background : theme.backgroundElement }]}>
-          <AppText type="small" style={{ color: onModel ? OnModel.text : theme.text }}>
-            {fact}
-          </AppText>
+        <View key={fact} style={[styles.chip, { backgroundColor: theme.backgroundElement }]}>
+          <AppText type="small">{fact}</AppText>
         </View>
       ))}
     </View>
