@@ -2,10 +2,11 @@
   "name": "climbingroutes-captures",
   "private": true,
   "type": "module",
-  "description": "Team PC scripts that turn uploaded captures into models for review",
+  "description": "Team PC scripts and worker that turn uploaded captures into models for review",
   "scripts": {
     "pull": "node --env-file=.env pull.mjs",
-    "finish": "node --env-file=.env finish.mjs"
+    "finish": "node --env-file=.env finish.mjs",
+    "worker": "node --env-file=.env worker.mjs"
   },
   "engines": {
     "node": ">=22"
