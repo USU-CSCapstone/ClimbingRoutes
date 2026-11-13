@@ -535,7 +535,7 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     flight = null;
     press =
       pointers.size === 1 && e.button === 0
-        ? { id: e.pointerId, x: e.clientX, y: e.clientY, time: performance.now() }
+        ? { id: e.pointerId, x: e.clientX, y: e.clientY, time: e.timeStamp }
         : null;
   }
 
@@ -545,7 +545,8 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     if (!p || p.id !== e.pointerId) return;
     press = null;
     if (!home) return;
-    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > TAP_SLOP || performance.now() - p.time > TAP_MS) {
+    // Timed by when the events happened, not when they're handled, so a busy page doesn't turn a click into a hold.
+    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > TAP_SLOP || e.timeStamp - p.time > TAP_MS) {
       return;
     }
     options.onSurfaceTap?.(pick(e.clientX, e.clientY));

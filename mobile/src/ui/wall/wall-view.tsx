@@ -4,10 +4,9 @@ import { useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Difficulty, SerifFont, Spacing, UngradedLine } from '@/constants/theme';
-import { difficultyBand } from '@/core/grades';
-import type { Grade, Uuid } from '@/core/types';
-import type { PublishedModel } from '@/core/models';
+import { SerifFont, Spacing } from '@/constants/theme';
+import { modelUrl, type PublishedModel } from '@/core/models';
+import type { Uuid } from '@/core/types';
 import { wallRoutes } from '@/core/walls';
 import { useRouteLines } from '@/data/models';
 import { useArea } from '@/data/queries';
@@ -18,6 +17,7 @@ import {
   FactChips,
   GlassButton,
   GradeSpread,
+  lineColor,
   OnModel,
   placeName,
   RoundButton,
@@ -136,7 +136,8 @@ export function WallView({
       <Stack.Screen options={{ title: wall.name }} />
       <StatusBar style="light" />
       <ModelLayer
-        model={model}
+        url={modelUrl(model.glbPath)}
+        cache={{ key: model.glbPath, group: model.wallUuid }}
         lines={lines}
         highlighted={selectedRoute?.line ? selectedRoute.uuid : null}
         insets={insets}
@@ -259,12 +260,6 @@ export function WallView({
       )}
     </View>
   );
-}
-
-/** Lines are drawn in their difficulty's color, or white when the grade has no band. */
-function lineColor(grade: Grade | null): string {
-  const band = difficultyBand(grade);
-  return band == null ? UngradedLine : Difficulty[band].line;
 }
 
 const styles = StyleSheet.create({
