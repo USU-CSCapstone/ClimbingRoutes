@@ -22,6 +22,7 @@ const MAX_TRIES = 3;
 fs.mkdirSync(DATA_DIR, { recursive: true });
 const LOG_FILE = path.join(DATA_DIR, "worker.log");
 const LOCK_FILE = path.join(DATA_DIR, "worker.lock");
+const TRIES_FILE = path.join(DATA_DIR, "tries.json");
 
 function log(message) {
   const line = `${new Date().toLocaleString()}  ${message}`;
@@ -42,7 +43,6 @@ process.on("exit", () => fs.rmSync(LOCK_FILE, { force: true }));
 for (const signal of ["SIGINT", "SIGTERM", "SIGBREAK"]) process.on(signal, () => process.exit(0));
 
 const supabase = admin();
-const tries = new Map();
 let lastSweep = 0;
 log(`Worker started. Checking for uploaded captures every ${POLL_MS / 1000} s.`);
 
@@ -62,20 +62,28 @@ for (;;) {
   }
 }
 
-/** Takes one capture from download to review, or to failed with a reason. */
+/**
+ * Takes one capture from download to review, or to failed with a reason. Tries
+ * are counted on disk, so one that crashes the worker can't get a fresh count on
+ * every restart and loop.
+ */
 async function handle(capture) {
-  const attempt = (tries.get(capture.id) ?? 0) + 1;
-  tries.set(capture.id, attempt);
+  const attempt = countTry(capture.id);
   if (attempt > MAX_TRIES) {
     await fail(supabase, capture.id, "Something went wrong on the team's computer while making the model.", log);
     log(`${capture.id}: gave up after ${MAX_TRIES} tries; see the errors above`);
-    return;
+  } else {
+    log(`${capture.id}: starting${attempt > 1 ? `, try ${attempt}` : ""} (wall ${capture.wall_uuid}, ${capture.photo_count} photos)`);
+    await makeModel(capture);
   }
-  log(`${capture.id}: starting${attempt > 1 ? `, try ${attempt}` : ""} (wall ${capture.wall_uuid}, ${capture.photo_count} photos)`);
+  // Only reached without an error: the capture is finished or failed either way.
+  clearTries(capture.id);
+}
+
+async function makeModel(capture) {
   // Its model was made before a crash: only the finishing is left.
   if ((await madeFrom(supabase, capture.id)) != null) {
     await finish(supabase, capture.id, { log });
-    tries.delete(capture.id);
     return;
   }
   if (!(await download(supabase, capture, log))) return;
@@ -86,7 +94,28 @@ async function handle(capture) {
     return;
   }
   await finish(supabase, capture.id, { log });
-  tries.delete(capture.id);
+}
+
+/** Adds a try for the capture and returns how many it has had. */
+function countTry(id) {
+  const tries = readTries();
+  tries[id] = (tries[id] ?? 0) + 1;
+  fs.writeFileSync(TRIES_FILE, JSON.stringify(tries, null, 2));
+  return tries[id];
+}
+
+function clearTries(id) {
+  const tries = readTries();
+  delete tries[id];
+  fs.writeFileSync(TRIES_FILE, JSON.stringify(tries, null, 2));
+}
+
+function readTries() {
+  try {
+    return JSON.parse(fs.readFileSync(TRIES_FILE, "utf8"));
+  } catch {
+    return {};
+  }
 }
 
 function isRunning(pid) {
