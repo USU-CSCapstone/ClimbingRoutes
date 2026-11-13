@@ -15,6 +15,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarLabelStyle: { fontWeight: '600' },
       }}>
+      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: tabIcon('home') }} />
       <Tabs.Screen name="(explore)" options={{ title: 'Explore', tabBarIcon: tabIcon('compass') }} />
       <Tabs.Screen name="(map)" options={{ title: 'Map', tabBarIcon: tabIcon('map') }} />
       <Tabs.Screen name="(search)" options={{ title: 'Search', tabBarIcon: tabIcon('search') }} />
