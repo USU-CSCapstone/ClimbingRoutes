@@ -1,18 +1,23 @@
 import { Stack } from 'expo-router';
+import { Platform } from 'react-native';
 
 import { useProfile } from '@/data/auth';
 import { Loading, Message } from '@/ui/components';
 
 /**
- * The moderator section, for the moderator account on a laptop browser. Only
+ * The moderator section, for the moderator account on a laptop browser: its
+ * screens need a mouse and a wide screen, and use the browser's dialogs. Only
  * the screens are kept from everyone else here; row-level security is what
  * stops other accounts from seeing or changing anything.
  */
+const LAPTOP = 'Moderator tools are in the web app. Open it in a browser on a laptop.';
+
 export default function ModerateLayout() {
   const { profile, loading, error } = useProfile();
 
   let gate = null;
-  if (loading) gate = <Loading />;
+  if (Platform.OS !== 'web') gate = <Message title="Use a laptop" detail={LAPTOP} />;
+  else if (loading) gate = <Loading />;
   else if (error) gate = <Message title="Couldn't check your account" detail={error.message} />;
   else if (!profile) gate = <Message title="Sign in first" detail="Moderator tools need the moderator account." />;
   else if (!profile.is_moderator) gate = <Message title="Moderators only" detail="This account can't use moderator tools." />;
