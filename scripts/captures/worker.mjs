@@ -12,7 +12,7 @@ import fs from "fs";
 import path from "path";
 
 import { admin, DATA_DIR } from "./lib.mjs";
-import { claim, download, fail, finish, interrupted, runRealityScan, sweep } from "./steps.mjs";
+import { claim, download, fail, finish, interrupted, madeFrom, runRealityScan, sweep } from "./steps.mjs";
 
 const POLL_MS = 60 * 1000;
 const SWEEP_MS = 24 * 60 * 60 * 1000;
@@ -72,6 +72,12 @@ async function handle(capture) {
     return;
   }
   log(`${capture.id}: starting${attempt > 1 ? `, try ${attempt}` : ""} (wall ${capture.wall_uuid}, ${capture.photo_count} photos)`);
+  // Its model was made before a crash: only the finishing is left.
+  if ((await madeFrom(supabase, capture.id)) != null) {
+    await finish(supabase, capture.id, { log });
+    tries.delete(capture.id);
+    return;
+  }
   if (!(await download(supabase, capture, log))) return;
   const run = await runRealityScan(capture.id, log);
   if (!run.ok) {

@@ -118,6 +118,16 @@ export async function finish(supabase, id, { model: modelArg, log = console.log 
   if (!["processing", "failed"].includes(capture.status)) {
     throw new Error(`Capture ${id} is ${capture.status}; only processing or failed captures can be finished`);
   }
+
+  // A crash after adding the model but before marking the capture processed leaves its model made
+  // already. Finish with that one rather than adding a second version.
+  const made = await madeFrom(supabase, id);
+  if (made != null) {
+    must("mark the capture processed", await supabase.from("captures").update({ status: "processed", failure_reason: null }).eq("id", id));
+    await deletePhotos(supabase, capture);
+    log(`${id}: v${made} was already made from this capture; marked it processed`);
+    return { version: made };
+  }
   if (!fs.existsSync(captureDir(id))) throw new Error(`${captureDir(id)} doesn't exist. Pull the capture on this PC first.`);
 
   // Did enough photos line up as one piece? RealityScan keeps only the biggest one.
@@ -139,6 +149,26 @@ export async function finish(supabase, id, { model: modelArg, log = console.log 
   }
   const triangles = countTriangles(readGlb(model).json);
 
+  const version = await addVersion(supabase, capture, model, bytes, triangles);
+  must("mark the capture processed", await supabase.from("captures").update({ status: "processed", failure_reason: null }).eq("id", id));
+
+  const deleted = await deletePhotos(supabase, capture);
+  log(`${id}: v${version} of wall ${capture.wall_uuid} is waiting for review: ${triangles.toLocaleString("en-US")} triangles, ${(bytes / 1e6).toFixed(1)} MB`);
+  log(`${id}: deleted ${deleted.remote} photos from Supabase and ${deleted.local} from this PC; scan.json is kept`);
+  return { version, triangles, bytes };
+}
+
+/** The version already made from this capture, or null. */
+export async function madeFrom(supabase, id) {
+  const made = must(
+    "look for a model made from this capture",
+    await supabase.from("wall_models").select("version").eq("source_capture", id).order("version").limit(1),
+  );
+  return made[0]?.version ?? null;
+}
+
+/** Uploads the model to review as the wall's next version and adds its row. Returns the version. */
+async function addVersion(supabase, capture, model, bytes, triangles) {
   // Versions never change, so this run becomes the wall's next one. No row has this path yet, so a
   // file left there by a failed earlier attempt can be replaced.
   const latest = must(
@@ -158,19 +188,14 @@ export async function finish(supabase, id, { model: modelArg, log = console.log 
   );
   const added = await supabase
     .from("wall_models")
-    .insert({ wall_uuid: capture.wall_uuid, version, glb_path: glbPath, bytes, triangles, source_capture: id })
+    .insert({ wall_uuid: capture.wall_uuid, version, glb_path: glbPath, bytes, triangles, source_capture: capture.id })
     .select()
     .single();
   if (added.error) {
     await supabase.storage.from("review").remove([glbPath]);
     must("add the model row", added);
   }
-  must("mark the capture processed", await supabase.from("captures").update({ status: "processed", failure_reason: null }).eq("id", id));
-
-  const deleted = await deletePhotos(supabase, capture);
-  log(`${id}: v${version} of wall ${capture.wall_uuid} is waiting for review: ${triangles.toLocaleString("en-US")} triangles, ${(bytes / 1e6).toFixed(1)} MB`);
-  log(`${id}: deleted ${deleted.remote} photos from Supabase and ${deleted.local} from this PC; scan.json is kept`);
-  return { version, triangles, bytes };
+  return version;
 }
 
 /** Marks a capture failed with a reason the person who took it sees. Its photos stay until the sweep. */
