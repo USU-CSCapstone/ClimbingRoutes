@@ -26,6 +26,8 @@ import {
 const MIN_ALIGNED = 0.8;
 export const SWEEP_DAYS = 14;
 const SCRIPT = fileURLToPath(new URL("../realityscan/run.reproject.ps1", import.meta.url));
+/** A RealityScan run taking longer than this has hung. 16 photos take about 4 minutes, 50 about 20. */
+const TIMEOUT_MS = (Number(process.env.REALITYSCAN_TIMEOUT_MINUTES) || 60) * 60 * 1000;
 
 /** Takes the oldest uploaded capture and marks it processing, or returns null if none is waiting. */
 export async function claim(supabase) {
@@ -75,7 +77,8 @@ export function realityScanCommand(id) {
  * Runs RealityScan on a downloaded capture through run.reproject.ps1, with its
  * output in runs\<id>.log. A run left by an earlier attempt is cleared first,
  * since the script won't overwrite one. RealityScan only works in the logged-in
- * desktop session, not over SSH. Resolves with whether it made a model.
+ * desktop session, not over SSH. A run past TIMEOUT_MS is stopped. Resolves with
+ * whether it made a model, and whether it timed out.
  */
 export function runRealityScan(id, log = console.log) {
   fs.rmSync(path.join(RUNS_DIR, id), { recursive: true, force: true });
@@ -94,16 +97,29 @@ export function runRealityScan(id, log = console.log) {
       ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", SCRIPT, "-Name", id, "-Imgs", dir, "-Root", RUNS_DIR],
       { stdio: ["ignore", out, out], windowsHide: true },
     );
+    let timedOut = false;
+    let settled = false;
     const done = (ok) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       fs.closeSync(out);
-      log(`${id}: RealityScan ${ok ? "finished" : "failed"} after ${Math.round((Date.now() - started) / 1000)} s`);
-      resolve({ ok, logFile });
+      if (timedOut) fs.appendFileSync(logFile, `\nStopped by the worker after ${TIMEOUT_MS / 60000} minutes.\n`);
+      const how = ok ? "finished" : timedOut ? "timed out" : "failed";
+      log(`${id}: RealityScan ${how} after ${Math.round((Date.now() - started) / 1000)} s`);
+      resolve({ ok, timedOut, logFile });
     };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      // The whole tree: the script starts RealityScan as its own process.
+      if (process.platform === "win32") spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true });
+      else child.kill("SIGKILL");
+    }, TIMEOUT_MS);
     child.on("error", (e) => {
       fs.appendFileSync(logFile, `\n${e.stack ?? e}\n`);
       done(false);
     });
-    child.on("exit", (code) => done(code === 0));
+    child.on("exit", (code) => done(code === 0 && !timedOut));
   });
 }
 
