@@ -12,7 +12,7 @@ import fs from "fs";
 import path from "path";
 
 import { admin, DATA_DIR } from "./lib.mjs";
-import { claim, download, fail, finish, interrupted, madeFrom, runRealityScan, sweep } from "./steps.mjs";
+import { claim, download, fail, failureReason, finish, interrupted, madeFrom, runRealityScan, sweep } from "./steps.mjs";
 
 const POLL_MS = 60 * 1000;
 const SWEEP_MS = 24 * 60 * 60 * 1000;
@@ -89,7 +89,7 @@ async function makeModel(capture) {
   if (!(await download(supabase, capture, log))) return;
   const run = await runRealityScan(capture.id, log);
   if (!run.ok) {
-    await fail(supabase, capture.id, "A 3D model couldn't be made from these photos. Scan again with more overlap between photos.", log);
+    await fail(supabase, capture.id, failureReason(run), log);
     log(`${capture.id}: RealityScan's output is in ${run.logFile}`);
     return;
   }

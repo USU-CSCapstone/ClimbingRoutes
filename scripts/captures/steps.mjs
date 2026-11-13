@@ -124,6 +124,26 @@ export function runRealityScan(id, log = console.log) {
 }
 
 /**
+ * Why a RealityScan run failed, in words for the person who took the photos.
+ * Read from the run's log, so the photos are only blamed when the log shows
+ * they were the problem, and the team's computer when it was.
+ */
+export function failureReason(run) {
+  if (run.timedOut) return "Making the model took too long on the team's computer.";
+  const text = fs.existsSync(run.logFile) ? fs.readFileSync(run.logFile, "utf8") : "";
+  const aligned = /Cameras aligned: (\d+) of (\d+)/.exec(text);
+  if (/need at least 3 cameras/.test(text) || (aligned && Number(aligned[1]) < Number(aligned[2]) * MIN_ALIGNED)) {
+    const which = aligned ? `Only ${aligned[1]} of ${aligned[2]} photos` : "Too few photos";
+    return `${which} lined up as one piece. Scan again with more overlap between photos.`;
+  }
+  if (/cameras are rolled/.test(text)) return "The phone was tilted in most photos. Hold it level and scan again.";
+  // RealityScan itself stopped, which bad photos and a problem on the PC can both cause.
+  if (/RealityScan failed\./.test(text)) return "RealityScan couldn't make a model from these photos, and it isn't clear why.";
+  // Anything else is the pipeline on the team's computer: a missing program or a step after RealityScan.
+  return "Something went wrong on the team's computer while making the model.";
+}
+
+/**
  * After RealityScan: checks that enough photos aligned and the model fits,
  * uploads it to review as the wall's next version, marks the capture
  * processed, and deletes its photos, keeping scan.json. A model given as
