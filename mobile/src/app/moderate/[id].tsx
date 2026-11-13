@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useEffectEvent, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
@@ -143,7 +143,14 @@ function Review({ model }: { model: WallModel }) {
     });
   }
 
-  // Keyboard shortcuts while drawing, and a warning before leaving with unsaved lines. Web only.
+  // Leaving with unsaved lines asks first: the back button, and on web reloading or closing the tab too.
+  usePreventRemove(unsaved, ({ repeat }) => {
+    if (!confirm('Leave without saving? Your unsaved lines will be lost.')) return;
+    setDrafts({});
+    repeat();
+  });
+
+  // Keyboard shortcuts while drawing. Web only.
   const keyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.key === 'Escape' && drawing) setDrawing(false);
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && drawing) {
@@ -157,12 +164,6 @@ function Review({ model }: { model: WallModel }) {
     addEventListener('keydown', onKeyDown);
     return () => removeEventListener('keydown', onKeyDown);
   }, []);
-  useEffect(() => {
-    if (Platform.OS !== 'web' || !unsaved) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
-    addEventListener('beforeunload', onBeforeUnload);
-    return () => removeEventListener('beforeunload', onBeforeUnload);
-  }, [unsaved]);
 
   const routesMessage = area.isPending
     ? 'Loading routes…'

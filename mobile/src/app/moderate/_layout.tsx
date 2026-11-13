@@ -10,6 +10,9 @@ import { Loading, Message } from '@/ui/components';
  * the screens are kept from everyone else here; row-level security is what
  * stops other accounts from seeing or changing anything.
  */
+// A review page opened from a link still has the queue to go back to.
+export const unstable_settings = { anchor: 'index' };
+
 const LAPTOP = 'Moderator tools are in the web app. Open it in a browser on a laptop.';
 
 export default function ModerateLayout() {
