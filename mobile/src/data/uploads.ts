@@ -91,7 +91,7 @@ export function cancelUpload(scanId: string) {
 
 let running = false;
 let again = false;
-let onUploaded: (() => void) | null = null;
+let onUploaded: (() => Promise<void>) | null = null;
 /** The scan whose capture is being marked uploaded, which can no longer be stopped (#76). */
 let finishing: string | null = null;
 /** Scans whose capture was started over this run. A second refusal stops instead of looping. */
@@ -210,9 +210,10 @@ async function upload(start: Scan) {
       .eq('id', scan.upload!.captureId);
     if (error) throw new Error(`Couldn't finish the upload: ${error.message}`);
 
+    // Fetch the account's captures first, so screens go from this scan to its capture without a gap.
+    await onUploaded?.();
     deleteScan(scan.id);
     setProgress(scan.id, null);
-    onUploaded?.();
   } catch (e) {
     if (e instanceof Stopped) setProgress(scan.id, null);
     else setProgress(scan.id, { state: 'failed', message: e instanceof Error ? e.message : String(e) });
