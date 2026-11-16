@@ -59,9 +59,15 @@ function SignedIn({ email, userId }: { email: string; userId: string }) {
           </View>
         ) : null}
         {profile?.is_moderator ? (
-          <View style={styles.tools}>
-            <LinkRow href="/moderate" title="Moderator tools" subtitle="Review models and draw routes" />
-          </View>
+          Platform.OS === 'web' ? (
+            <View style={styles.tools}>
+              <LinkRow href="/moderate" title="Moderator tools" subtitle="Review models and draw routes" />
+            </View>
+          ) : (
+            <AppText type="small" color="textSecondary" style={styles.notice}>
+              Moderator tools are in the web app. Open it in a browser on a laptop.
+            </AppText>
+          )
         ) : null}
         {Platform.OS === 'web' ? null : <UploadSettings />}
         <YourScans userId={userId} />

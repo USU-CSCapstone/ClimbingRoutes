@@ -4,7 +4,7 @@ import type { DOMProps } from 'expo/dom';
 import { useEffect, useEffectEvent, useRef } from 'react';
 
 import type { Uuid } from '@/core/types';
-import type { Insets, ModelCacheKey, ModelInfo, Viewer, ViewerRoute } from '@/viewer/types';
+import type { Insets, ModelCacheKey, ModelInfo, SurfaceHit, Viewer, ViewerRoute } from '@/viewer/types';
 import { createViewer } from '@/viewer/viewer';
 
 export interface WallViewerProps {
@@ -15,8 +15,14 @@ export interface WallViewerProps {
   routes: ViewerRoute[];
   /** Route to highlight. The others dim and the camera flies to it. */
   highlighted?: Uuid | null;
+  /** Fly the camera to the highlighted route. Defaults to true; off while drawing, so the view holds still. */
+  flyToHighlight?: boolean;
   /** Keep the camera in front of the wall. Defaults to true. */
   frontArc?: boolean;
+  /** Dim the other routes while one is highlighted. Defaults to true. Read when the model loads. */
+  dimOthers?: boolean;
+  /** Mark the placed points on the highlighted route, for drawing. */
+  showPoints?: boolean;
   /** Space the screen's own controls cover, so routes are framed in what's left. */
   insets?: Insets;
   /** Change this number to fly the camera back to the whole wall. */
@@ -26,6 +32,8 @@ export interface WallViewerProps {
   onError?: (message: string) => void;
   onRouteTap?: (uuid: Uuid) => void;
   onEmptyTap?: () => void;
+  /** Every tap, with the point on the rock under it, or null if it missed the wall. */
+  onSurfaceTap?: (hit: SurfaceHit | null) => void;
   onFps?: (fps: number) => void;
   dom?: DOMProps;
 }
@@ -40,7 +48,10 @@ export default function WallViewer({
   cache,
   routes,
   highlighted = null,
+  flyToHighlight = true,
   frontArc = true,
+  dimOthers = true,
+  showPoints = false,
   insets,
   showWholeWall = 0,
   onProgress,
@@ -48,6 +59,7 @@ export default function WallViewer({
   onError,
   onRouteTap,
   onEmptyTap,
+  onSurfaceTap,
   onFps,
 }: WallViewerProps) {
   const container = useRef<HTMLDivElement>(null);
@@ -60,6 +72,7 @@ export default function WallViewer({
   const failed = useEffectEvent((message: string) => onError?.(message));
   const tapped = useEffectEvent((uuid: Uuid) => onRouteTap?.(uuid));
   const missed = useEffectEvent(() => onEmptyTap?.());
+  const surface = useEffectEvent((hit: SurfaceHit | null) => onSurfaceTap?.(hit));
   const measured = useEffectEvent((fps: number) => onFps?.(fps));
 
   useEffect(() => {
@@ -67,11 +80,13 @@ export default function WallViewer({
     const v = createViewer(container.current, {
       model,
       cache,
+      dimOthers,
       onProgress: (fraction) => progressed(fraction),
       onLoad: (info) => loaded(info),
       onError: (error) => failed(error.message),
       onRouteTap: (uuid) => tapped(uuid),
       onEmptyTap: () => missed(),
+      onSurfaceTap: (hit) => surface(hit),
       onFps: (fps) => measured(fps),
     });
     viewer.current = v;
@@ -79,7 +94,7 @@ export default function WallViewer({
       v.dispose();
       viewer.current = null;
     };
-    // The cache key belongs to the model URL, so a new key alone doesn't reload.
+    // The cache key and dimOthers are read when the model loads, so changing them alone doesn't reload it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model]);
 
@@ -88,9 +103,10 @@ export default function WallViewer({
   useEffect(() => viewer.current?.setInsets({ top, right, bottom, left }), [model, top, right, bottom, left]);
   useEffect(() => {
     viewer.current?.highlight(highlighted);
-    if (highlighted) viewer.current?.focus(highlighted);
-  }, [model, highlighted]);
+    if (highlighted && flyToHighlight) viewer.current?.focus(highlighted);
+  }, [model, highlighted, flyToHighlight]);
   useEffect(() => viewer.current?.setFrontArc(frontArc), [model, frontArc]);
+  useEffect(() => viewer.current?.setOverlays({ points: showPoints }), [model, showPoints]);
   useEffect(() => {
     if (showWholeWall) viewer.current?.focus(null);
   }, [model, showWholeWall]);

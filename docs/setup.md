@@ -88,7 +88,7 @@ To publish a wall that has no model yet, with its lines, as v1: from `supabase/`
 
 On the team PC: Windows, an NVIDIA GPU, Node, and RealityScan 2.2 installed through the Epic Games Launcher (the script looks for `RealityScan.exe` under `C:\Program Files\Epic Games`).
 
-Photos taken in the app upload as a capture. On the team PC, `scripts/captures/` downloads each one, and after RealityScan puts the model up for the moderator's review. See [scripts/captures/README.md](../scripts/captures/README.md).
+Photos taken in the app upload as a capture. On the team PC, a worker in `scripts/captures/` picks up each one on its own, runs RealityScan, and puts the model up for the moderator's review. It's set up once with `install-task.ps1`; see [scripts/captures/README.md](../scripts/captures/README.md).
 
 To run RealityScan on a folder of photos by hand:
 
