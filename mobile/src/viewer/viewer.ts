@@ -15,7 +15,8 @@ import { acceleratedRaycast, MeshBVH } from 'three-mesh-bvh';
 import type { Uuid } from '@/core/types';
 import { ROUTE_COLORS } from '@/viewer/colors';
 import { drape, findCapturedFace, typicalEdge } from '@/viewer/geometry';
-import { loadModelBytes } from '@/viewer/model-cache';
+import { forgetModel, loadModelBytes } from '@/viewer/model-cache';
+import { limitTextures, textureLimit } from '@/viewer/textures';
 import type {
   DrapeStats,
   Insets,
@@ -182,13 +183,29 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
   const failed = (err: unknown) => {
     if (!disposed) options.onError?.(err instanceof Error ? err : new Error(String(err)));
   };
-  loadModelBytes(options.model, options.cache, (loaded, total) => options.onProgress?.(loaded / total), download.signal)
-    .then((file) => {
-      if (disposed) return;
-      bytes = file.bytes.byteLength;
-      new GLTFLoader().parse(file.bytes, '', onModel, failed);
-    })
-    .catch(failed);
+  const maxTexture = textureLimit(renderer.capabilities.maxTextureSize);
+
+  /** Downloads or reads the saved model and parses it. A saved copy that won't parse is dropped and downloaded again, once. */
+  function load(retry: boolean) {
+    loadModelBytes(options.model, options.cache, (loaded, total) => options.onProgress?.(loaded / total), download.signal)
+      .then(async (file) => {
+        if (disposed) return;
+        bytes = file.bytes.byteLength;
+        let gltf: GLTF;
+        try {
+          // parseAsync, because parse throws some errors rather than passing them on.
+          gltf = await new GLTFLoader().register(limitTextures(maxTexture)).parseAsync(file.bytes, '');
+        } catch (err) {
+          if (!(file.fromCache && retry && options.cache)) throw err;
+          await forgetModel(options.cache.key);
+          load(false);
+          return;
+        }
+        onModel(gltf);
+      })
+      .catch(failed);
+  }
+  load(true);
 
   function onModel(gltf: GLTF) {
     const wall = gltf.scene;

@@ -12,6 +12,8 @@ export function uploadText(progress: UploadProgress | null): string {
       return `${WAITING[progress.reason]} — ${photos(progress.photos)}, ${mb(progress.bytes)}`;
     case 'uploading':
       return `Uploading photo ${progress.done + 1} of ${progress.total} — ${mb(progress.bytes)} left`;
+    case 'finishing':
+      return 'Finishing the upload…';
     case 'failed':
       return `Upload stopped: ${progress.message}`;
   }
