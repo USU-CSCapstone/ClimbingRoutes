@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -23,7 +24,20 @@ import { AppText } from '@/ui/text';
 export default function SearchScreen() {
   const theme = useTheme();
   const hrefs = useHrefs();
-  const [text, setText] = useState('');
+  const navigation = useNavigation<{ setParams(params: { q?: string }): void }>();
+  const { q } = useLocalSearchParams<{ q?: string }>();
+  const [text, setText] = useState(q ?? '');
+  // ?q= is what was typed on Home. It's taken into the box, then cleared, so typing
+  // the same words on Home again still replaces whatever is here. This screen's own
+  // setParams, not router.setParams, which goes to whichever navigator is on top.
+  const [seenQ, setSeenQ] = useState(q);
+  if (q !== seenQ) {
+    setSeenQ(q);
+    if (q) setText(q);
+  }
+  useEffect(() => {
+    if (q !== undefined) navigation.setParams({ q: undefined });
+  }, [q, navigation]);
   const query = useDebounced(text, 200);
   const { data, isFetching, error } = useSearch(query);
 
