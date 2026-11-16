@@ -40,7 +40,9 @@ export function ScanCard({ wallUuid }: { wallUuid: Uuid }) {
       <>
         <AppText color={progress?.state === 'failed' ? 'danger' : 'textSecondary'}>{uploadText(progress)}</AppText>
         {progress?.state === 'failed' ? <ActionButton icon="refresh" label="Try again" onPress={kickUploads} primary /> : null}
-        <ActionButton label="Stop uploading" onPress={() => cancelUpload(scan.id)} />
+        {progress?.state === 'finishing' ? null : (
+          <ActionButton label="Stop uploading" onPress={() => cancelUpload(scan.id)} />
+        )}
       </>
     );
   } else if (scan) {
