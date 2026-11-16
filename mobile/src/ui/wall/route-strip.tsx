@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import {
   FlatList,
   type NativeScrollEvent,
@@ -104,6 +104,8 @@ function RouteCards({
   /** The card the strip rests on, which matches the selection once a swipe settles. */
   const resting = useRef(index);
   const offset = useRef(index * interval);
+  /** The card spacing the strip was last placed for. */
+  const spacing = useRef(interval);
   const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // A route picked on the model or with the arrows slides its card into place.
@@ -112,6 +114,16 @@ function RouteCards({
     resting.current = index;
     list.current?.scrollToOffset({ offset: index * interval, animated: true });
   }, [index, interval]);
+
+  // The cards resize with a narrow window. Put the resting card back in place: at the
+  // old scroll distance the strip sits between two cards, and the next scroll picks a neighbor.
+  useLayoutEffect(() => {
+    if (spacing.current === interval) return;
+    spacing.current = interval;
+    if (settle.current) clearTimeout(settle.current);
+    offset.current = resting.current * interval;
+    list.current?.scrollToOffset({ offset: offset.current, animated: false });
+  }, [interval]);
 
   useEffect(
     () => () => {
@@ -122,6 +134,10 @@ function RouteCards({
 
   // Native snaps on its own; web has no interval snapping, so both also snap here once scrolling stops.
   function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    // The web reports a last scroll 100 ms after scrolling stops, even if the strip has gone
+    // by then (the window grew into the wide layout). A removed list reads as scrolled to
+    // the start, which would select the first route.
+    if (!list.current) return;
     offset.current = e.nativeEvent.contentOffset.x;
     if (settle.current) clearTimeout(settle.current);
     settle.current = setTimeout(() => {
