@@ -18,6 +18,8 @@ export interface ViewerRoute {
   color?: string;
   /** Defaults to true. */
   visible?: boolean;
+  /** Drawn faded, like a route outside the filters. Not faded while highlighted. */
+  dimmed?: boolean;
 }
 
 export interface ModelInfo {

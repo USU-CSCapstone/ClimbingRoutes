@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import type { MapView } from '@/core/map';
@@ -8,6 +8,7 @@ import { useMapDots } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { climbCount, LinkRow, Message } from '@/ui/components';
 import { DOM_WEBVIEW } from '@/ui/dom';
+import { FilterBar } from '@/ui/filters';
 import { useHrefs } from '@/ui/nav';
 import WallMap from '@/ui/wall-map';
 
@@ -38,6 +39,8 @@ export default function MapScreen() {
         onViewChange={async (v) => setView(v)}
         dom={{ ...DOM_WEBVIEW, style: styles.screen, scrollEnabled: false, bounces: false }}
       />
+      {/* Dots with no routes that match the filters are left off the map. */}
+      <FilterBar style={styles.filters} />
       {/* The selected dot shows in a card at the bottom, within thumb reach, above the map credits. */}
       {dot ? (
         <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.border }]}>
@@ -53,6 +56,8 @@ const ATTRIBUTION_HEIGHT = 32;
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  // Clear of the zoom buttons, which only show on web.
+  filters: { position: 'absolute', top: Spacing.two, left: Platform.OS === 'web' ? 48 : 0, right: 0 },
   card: {
     position: 'absolute',
     left: Spacing.three,

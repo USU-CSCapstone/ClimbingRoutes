@@ -1,21 +1,36 @@
 // Name search for climbs and areas. Typesense is the primary provider; if it
 // fails, GraphQL area search keeps area results working (it can't search climbs).
 import { ROOT_AREA, TYPESENSE_KEY, TYPESENSE_URL } from '../config';
+import { hasFilters, matchesClimb, NO_FILTERS, rangesInUse, type RouteFilters } from '../filters';
 import { gradeFromText } from '../grades';
 import { gql } from '../openbeta/graphql';
-import type { Discipline, SearchResults } from '../types';
+import type { Discipline, LatLng, SearchResults } from '../types';
 
 export const MIN_QUERY_LENGTH = 2;
 const LIMIT = 25;
+/** Grades are filtered here rather than by Typesense, so fetch more to still fill the list. */
+const LIMIT_WITH_GRADES = 100;
 
-export async function search(query: string, signal?: AbortSignal): Promise<SearchResults> {
+/**
+ * Type and distance filters go to Typesense. Distance applies to routes and
+ * walls; bigger areas always show, since some of their walls may be close.
+ * Without a user location, distance is ignored.
+ */
+export async function search(
+  query: string,
+  filters: RouteFilters = NO_FILTERS,
+  user: LatLng | null = null,
+  signal?: AbortSignal,
+): Promise<SearchResults> {
   const q = query.trim();
   if (q.length < MIN_QUERY_LENGTH) return { areas: [], climbs: [], best: 'climbs' };
   try {
-    return await searchTypesense(q, signal);
+    return await searchTypesense(q, filters, user, signal);
   } catch (err) {
     if (signal?.aborted) throw err;
-    return { areas: await searchAreasGraphql(q, signal), climbs: [], best: 'areas' };
+    // The fallback can't filter, so with filters on it finds nothing rather than the wrong things.
+    const areas = !hasFilters(filters) ? await searchAreasGraphql(q, signal) : [];
+    return { areas, climbs: [], best: 'areas' };
   }
 }
 
@@ -45,7 +60,21 @@ interface TsResponse {
   }[];
 }
 
-async function searchTypesense(q: string, signal?: AbortSignal): Promise<SearchResults> {
+async function searchTypesense(
+  q: string,
+  filters: RouteFilters,
+  user: LatLng | null,
+  signal?: AbortSignal,
+): Promise<SearchResults> {
+  const near = user && filters.withinMiles != null ? `(${user.lat},${user.lng},${filters.withinMiles} mi)` : null;
+  const areaFilter = [`pathTokens:=${ROOT_AREA.name}`, near && `(leaf:false || areaLatLng:${near})`];
+  const climbFilter = [
+    `areaNames:=${ROOT_AREA.name}`,
+    filters.types.length > 0 && `disciplines:=[${filters.types.map(fromDiscipline).join(',')}]`,
+    near && `cragLatLng:${near}`,
+  ];
+  const ranges = rangesInUse(filters);
+  const gradesOn = !!(ranges.yds || ranges.vscale);
   const res = await fetch(`${TYPESENSE_URL}/multi_search`, {
     method: 'POST',
     headers: { 'X-TYPESENSE-API-KEY': TYPESENSE_KEY, 'Content-Type': 'application/json' },
@@ -55,7 +84,7 @@ async function searchTypesense(q: string, signal?: AbortSignal): Promise<SearchR
           collection: 'areas',
           q,
           query_by: 'name',
-          filter_by: `pathTokens:=${ROOT_AREA.name}`,
+          filter_by: areaFilter.filter(Boolean).join(' && '),
           sort_by: '_text_match:desc,totalClimbs:desc',
           per_page: 10,
         },
@@ -63,8 +92,8 @@ async function searchTypesense(q: string, signal?: AbortSignal): Promise<SearchR
           collection: 'climbs',
           q,
           query_by: 'climbName',
-          filter_by: `areaNames:=${ROOT_AREA.name}`,
-          per_page: LIMIT,
+          filter_by: climbFilter.filter(Boolean).join(' && '),
+          per_page: gradesOn ? LIMIT_WITH_GRADES : LIMIT,
         },
       ],
     }),
@@ -95,11 +124,13 @@ async function searchTypesense(q: string, signal?: AbortSignal): Promise<SearchR
     if (seen.has(c.climbUUID)) continue;
     seen.add(c.climbUUID);
     const disciplines = c.disciplines.map(toDiscipline);
+    const grade = gradeFromText(c.grade);
+    if (climbs.length >= LIMIT || !matchesClimb({ grade, disciplines }, filters)) continue;
     climbs.push({
       kind: 'climb' as const,
       uuid: c.climbUUID,
       name: c.climbName,
-      grade: gradeFromText(c.grade),
+      grade,
       disciplines,
       path: c.areaNames,
     });
@@ -117,6 +148,12 @@ function toDiscipline(d: string): Discipline {
   if (d === 'bouldering') return 'boulder';
   if (d === 'deepwatersolo') return 'dws';
   return d as Discipline;
+}
+
+function fromDiscipline(d: Discipline): string {
+  if (d === 'boulder') return 'bouldering';
+  if (d === 'dws') return 'deepwatersolo';
+  return d;
 }
 
 async function searchAreasGraphql(q: string, signal?: AbortSignal) {

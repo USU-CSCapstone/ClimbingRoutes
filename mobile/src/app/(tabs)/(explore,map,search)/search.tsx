@@ -13,11 +13,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing, TapTarget } from '@/constants/theme';
+import { hasFilters } from '@/core/filters';
 import { MIN_QUERY_LENGTH } from '@/core/search';
 import type { SearchResult } from '@/core/types';
+import { useFilters } from '@/data/filters';
 import { useSearch } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { climbCount, disciplineText, GradeBadge, LinkRow, Loading, Message } from '@/ui/components';
+import { FilterBar } from '@/ui/filters';
 import { useHrefs } from '@/ui/nav';
 import { AppText } from '@/ui/text';
 
@@ -40,6 +43,7 @@ export default function SearchScreen() {
   }, [q, navigation]);
   const query = useDebounced(text, 200);
   const { data, isFetching, error } = useSearch(query);
+  const filtered = hasFilters(useFilters());
 
   const ready = query.trim().length >= MIN_QUERY_LENGTH;
   const areaSection = { title: 'Areas', data: (data?.areas ?? []) as SearchResult[] };
@@ -58,7 +62,16 @@ export default function SearchScreen() {
   } else if (!data) {
     body = <Loading />;
   } else if (sections.length === 0) {
-    body = <Message title="No matches" detail={`Nothing in the USA matches “${query.trim()}”.`} />;
+    body = (
+      <Message
+        title="No matches"
+        detail={
+          filtered
+            ? `Nothing matches “${query.trim()}” with your filters.`
+            : `Nothing in the USA matches “${query.trim()}”.`
+        }
+      />
+    );
   } else {
     body = (
       <SectionList
@@ -99,6 +112,7 @@ export default function SearchScreen() {
         <View style={styles.flex}>{body}</View>
         {/* Search box sits at the bottom so it's reachable one-handed. */}
         <View style={[styles.inputBar, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
+          <FilterBar style={styles.filters} />
           <View style={[styles.inputWrap, { backgroundColor: theme.backgroundElement }]}>
             <Ionicons name="search" size={22} color={theme.textSecondary} />
             <TextInput
@@ -143,7 +157,9 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   list: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', paddingBottom: Spacing.three },
   sectionHeader: { paddingHorizontal: Spacing.three, paddingTop: Spacing.four, paddingBottom: Spacing.one },
-  inputBar: { padding: Spacing.two, borderTopWidth: StyleSheet.hairlineWidth },
+  inputBar: { padding: Spacing.two, gap: Spacing.two, borderTopWidth: StyleSheet.hairlineWidth },
+  // The chips scroll edge to edge, past the bar's padding.
+  filters: { marginHorizontal: -Spacing.two },
   inputWrap: {
     width: '100%',
     maxWidth: MaxContentWidth,

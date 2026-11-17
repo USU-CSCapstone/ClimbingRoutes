@@ -73,6 +73,7 @@ function RoutePills({
           style={({ pressed }) => [
             styles.pill,
             { backgroundColor: theme.background, borderColor: theme.border },
+            route.dimmed && styles.dimmed,
             pressed && styles.pressed,
           ]}>
           <NumberBadge route={route} linesKnown={linesKnown} size={32} />
@@ -200,4 +201,5 @@ const styles = StyleSheet.create({
   },
   pillName: { fontWeight: '600', maxWidth: 160 },
   pressed: { opacity: 0.75 },
+  dimmed: { opacity: 0.45 },
 });

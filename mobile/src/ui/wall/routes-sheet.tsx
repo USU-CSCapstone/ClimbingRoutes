@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SerifFont, Spacing } from '@/constants/theme';
 import type { Uuid } from '@/core/types';
 import { useTheme } from '@/hooks/use-theme';
+import { FilterBar } from '@/ui/filters';
 import { AppText } from '@/ui/text';
 import { FactChips, GradeSpread, RoundButton, RouteList } from '@/ui/wall/parts';
 import type { ShownRoute, WallInfo } from '@/ui/wall/types';
@@ -95,6 +96,7 @@ export function RoutesSheet({
           </View>
           <FactChips facts={facts} />
           <GradeSpread routes={routes} />
+          <FilterBar style={styles.filters} />
         </View>
         <RouteList
           routes={routes}
@@ -128,4 +130,6 @@ const styles = StyleSheet.create({
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginTop: Spacing.two },
   heading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   title: { fontSize: 30, lineHeight: 36 },
+  // The chips scroll edge to edge, past the sheet's padding.
+  filters: { marginHorizontal: -Spacing.three },
 });

@@ -316,16 +316,19 @@ function RouteRow({
           style={[styles.selectedBar, { backgroundColor: route.color === UngradedLine ? theme.text : route.color }]}
         />
       ) : null}
-      <NumberBadge route={route} linesKnown={linesKnown} />
-      <View style={styles.rowText}>
-        <AppText numberOfLines={1} style={styles.rowTitle}>
-          {route.name}
-        </AppText>
-        <AppText type="small" color="textSecondary" numberOfLines={1}>
-          {details}
-        </AppText>
+      {/* Faded rather than hidden, so a route outside the filters keeps its place and number. */}
+      <View style={[styles.rowContent, route.dimmed && !selected && styles.dimmed]}>
+        <NumberBadge route={route} linesKnown={linesKnown} />
+        <View style={styles.rowText}>
+          <AppText numberOfLines={1} style={styles.rowTitle}>
+            {route.name}
+          </AppText>
+          <AppText type="small" color="textSecondary" numberOfLines={1}>
+            {details}
+          </AppText>
+        </View>
+        <GradePill grade={route.grade} />
       </View>
-      <GradePill grade={route.grade} />
     </Pressable>
   );
 }
@@ -369,6 +372,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   selectedBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+  rowContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  dimmed: { opacity: 0.45 },
   rowText: { flex: 1 },
   rowTitle: { fontWeight: '600' },
 });

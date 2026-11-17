@@ -69,3 +69,50 @@ export function difficultyBand(grade: Grade | null): DifficultyBand | null {
   const band = limits.findIndex((limit) => read.base < limit);
   return (band < 0 ? 3 : band) as DifficultyBand;
 }
+
+/**
+ * Steps on each scale the grade filter can be set to. YDS steps below 5.10 are
+ * whole numbers; from 5.10 each letter is a quarter, so 5.10c is 10.5.
+ */
+export const YDS_STEPS: { label: string; value: number }[] = [
+  ...Array.from({ length: 10 }, (_, n) => ({ label: `5.${n}`, value: n })),
+  ...Array.from({ length: 6 }, (_, i) =>
+    [...'abcd'].map((letter, j) => ({ label: `5.${10 + i}${letter}`, value: 10 + i + j / 4 })),
+  ).flat(),
+];
+
+/** VB is -1. */
+export const V_STEPS: { label: string; value: number }[] = [
+  { label: 'VB', value: -1 },
+  ...Array.from({ length: 18 }, (_, n) => ({ label: `V${n}`, value: n })),
+];
+
+/**
+ * The filter steps a grade covers, low to high. 5.10 covers 5.10a–d, 5.10- is
+ * a–b, 5.10+ is c–d, and V3-4 is V3–V4. Null for other systems or text it can't read.
+ */
+export function gradeSpan(grade: Grade | null): { system: 'yds' | 'vscale'; lo: number; hi: number } | null {
+  if (!grade) return null;
+  const text = grade.text.trim();
+  if (grade.system === 'yds') {
+    const m = /^5\.(\d+)([abcd])?([+-](?!\d))?/i.exec(text);
+    if (!m) return null;
+    const base = Number(m[1]);
+    if (base < 10) return { system: 'yds', lo: base, hi: base };
+    if (m[2]) {
+      const v = base + 'abcd'.indexOf(m[2].toLowerCase()) / 4;
+      return { system: 'yds', lo: v, hi: v };
+    }
+    if (m[3] === '-') return { system: 'yds', lo: base, hi: base + 0.25 };
+    if (m[3] === '+') return { system: 'yds', lo: base + 0.5, hi: base + 0.75 };
+    return { system: 'yds', lo: base, hi: base + 0.75 };
+  }
+  if (grade.system === 'vscale') {
+    const m = /^V(B|\d+)(?:-(\d+))?/i.exec(text);
+    if (!m) return null;
+    const lo = m[1].toUpperCase() === 'B' ? -1 : Number(m[1]);
+    const hi = m[2] ? Math.max(lo, Number(m[2])) : lo;
+    return { system: 'vscale', lo, hi };
+  }
+  return null;
+}

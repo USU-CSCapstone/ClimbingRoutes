@@ -364,7 +364,8 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     clearGroup(state.group);
     const { points, normals } = state.route;
     const isHighlighted = state.route.uuid === highlighted;
-    const opacity = highlighted && !isHighlighted && (options.dimOthers ?? true) ? DIMMED : 1;
+    const faded = !isHighlighted && (state.route.dimmed || (highlighted && (options.dimOthers ?? true)));
+    const opacity = faded ? DIMMED : 1;
     if (isHighlighted && overlays.points) {
       for (const p of points) {
         const dot = new THREE.Sprite(dotMaterial);

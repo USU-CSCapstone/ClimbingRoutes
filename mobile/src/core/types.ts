@@ -39,13 +39,13 @@ export interface AreaSummary {
   totalClimbs: number;
   isLeaf: boolean;
   isBoulder: boolean;
+  location: LatLng | null;
 }
 
 export interface Area extends AreaSummary {
   /** Ancestors from the country down to the parent. Excludes this area. */
   path: Crumb[];
   description: string | null;
-  location: LatLng | null;
   children: AreaSummary[];
   /** Sorted left to right when OpenBeta has an order, otherwise by name. */
   climbs: ClimbSummary[];
