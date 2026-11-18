@@ -634,7 +634,11 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
 
   let frames = 0;
   let lastFps = performance.now();
+  const gl = renderer.getContext();
   renderer.setAnimationLoop(() => {
+    // The context can be lost a frame before three.js hears of it. Rendering then makes WebKit throw
+    // on the null shaders it gets back, so wait for three.js to restore it.
+    if (gl.isContextLost()) return;
     stepFlight(performance.now());
     controls?.update();
     renderer.render(scene, camera);
