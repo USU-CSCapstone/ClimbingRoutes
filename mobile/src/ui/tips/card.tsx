@@ -22,9 +22,9 @@ export const CARD_RADIUS = 28;
 /** Whether what a card shows is the right way, the wrong way, or neither yet. */
 export type MarkState = 'right' | 'wrong' | 'none';
 
-/** The light tap a phone gives when a control changes. */
+/** The light tap a phone gives when a control changes. A phone that can't give one is left quiet. */
 export function tick() {
-  if (Platform.OS !== 'web') Haptics.selectionAsync();
+  if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
 }
 
 /**

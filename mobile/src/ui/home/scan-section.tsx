@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { type Href, router } from 'expo-router';
+import { router } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
@@ -57,7 +57,7 @@ export function ScanSection() {
         role="button"
         {...NO_CLICK_FOCUS}
         hitSlop={6}
-        onPress={() => router.push('/photo-tips' as Href)}
+        onPress={() => router.push('/photo-tips')}
         style={[styles.tips, { backgroundColor: theme.backgroundElement }]}>
         <Ionicons name="bulb-outline" size={18} color={theme.text} />
         <AppText style={styles.tipsTitle}>Photo tips</AppText>

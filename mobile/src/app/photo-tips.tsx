@@ -1,4 +1,4 @@
-import { type Href, router, Stack, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useState } from 'react';
 import {
@@ -78,14 +78,14 @@ export default function PhotoTipsScreen() {
 
   function back() {
     if (router.canGoBack()) router.back();
-    else router.replace('/' as Href);
+    else router.replace('/');
   }
 
   const next = (
     <Pressy
       role="button"
       {...NO_CLICK_FOCUS}
-      onPress={uploading ? back : () => router.navigate('/(tabs)/(search)/search' as Href)}
+      onPress={uploading ? back : () => router.navigate('/(tabs)/(search)/search')}
       style={styles.next}>
       <View style={styles.flex}>
         <Display style={styles.nextTitle}>Got your photos?</Display>

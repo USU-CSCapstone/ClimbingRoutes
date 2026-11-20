@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { type Href, router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -73,7 +73,7 @@ export default function UploadScreen() {
           {/* `from` has the tips page's last card lead back here rather than off to find a wall. */}
           <ActionButton
             label="See the photo tips"
-            onPress={() => router.push({ pathname: '/photo-tips', params: { from: 'upload' } } as Href)}
+            onPress={() => router.push({ pathname: '/photo-tips', params: { from: 'upload' } })}
           />
         </View>
       </ScrollView>
