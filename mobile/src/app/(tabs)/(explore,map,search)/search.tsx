@@ -13,11 +13,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing, TapTarget } from '@/constants/theme';
-import { MIN_QUERY_LENGTH } from '@/core/search';
+import { hasFilters } from '@/core/filters';
+import { GRADE_CHECK_LIMIT, MIN_QUERY_LENGTH } from '@/core/search';
 import type { SearchResult } from '@/core/types';
+import { useFilters } from '@/data/filters';
 import { useSearch } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { climbCount, disciplineText, GradeBadge, LinkRow, Loading, Message } from '@/ui/components';
+import { FilterBar } from '@/ui/filters';
 import { useHrefs } from '@/ui/nav';
 import { AppText } from '@/ui/text';
 
@@ -40,6 +43,7 @@ export default function SearchScreen() {
   }, [q, navigation]);
   const query = useDebounced(text, 200);
   const { data, isFetching, error } = useSearch(query);
+  const filtered = hasFilters(useFilters());
 
   const ready = query.trim().length >= MIN_QUERY_LENGTH;
   const areaSection = { title: 'Areas', data: (data?.areas ?? []) as SearchResult[] };
@@ -50,6 +54,8 @@ export default function SearchScreen() {
         (s) => s.data.length > 0,
       );
 
+  const partialNote = `Only the ${GRADE_CHECK_LIMIT.toLocaleString()} best name matches were checked against your grades. Type more of the name to find others.`;
+
   let body;
   if (!ready) {
     body = <Message title="Search routes and areas" detail="Type a name, like Hooked or Logan Canyon." />;
@@ -58,7 +64,18 @@ export default function SearchScreen() {
   } else if (!data) {
     body = <Loading />;
   } else if (sections.length === 0) {
-    body = <Message title="No matches" detail={`Nothing in the USA matches “${query.trim()}”.`} />;
+    body = (
+      <Message
+        title="No matches"
+        detail={
+          data.partial
+            ? partialNote
+            : filtered
+            ? `Nothing matches “${query.trim()}” with your filters.`
+            : `Nothing in the USA matches “${query.trim()}”.`
+        }
+      />
+    );
   } else {
     body = (
       <SectionList
@@ -68,6 +85,13 @@ export default function SearchScreen() {
         keyboardDismissMode="on-drag"
         contentContainerStyle={styles.list}
         stickySectionHeadersEnabled={false}
+        ListFooterComponent={
+          data.partial ? (
+            <AppText type="small" color="textSecondary" style={styles.partial}>
+              {partialNote}
+            </AppText>
+          ) : undefined
+        }
         renderSectionHeader={({ section }) => (
           <AppText type="label" color="textSecondary" style={styles.sectionHeader}>
             {section.title}
@@ -99,6 +123,7 @@ export default function SearchScreen() {
         <View style={styles.flex}>{body}</View>
         {/* Search box sits at the bottom so it's reachable one-handed. */}
         <View style={[styles.inputBar, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
+          <FilterBar style={styles.filters} />
           <View style={[styles.inputWrap, { backgroundColor: theme.backgroundElement }]}>
             <Ionicons name="search" size={22} color={theme.textSecondary} />
             <TextInput
@@ -142,8 +167,11 @@ function useDebounced<T>(value: T, ms: number): T {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   list: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', paddingBottom: Spacing.three },
+  partial: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
   sectionHeader: { paddingHorizontal: Spacing.three, paddingTop: Spacing.four, paddingBottom: Spacing.one },
-  inputBar: { padding: Spacing.two, borderTopWidth: StyleSheet.hairlineWidth },
+  inputBar: { padding: Spacing.two, gap: Spacing.two, borderTopWidth: StyleSheet.hairlineWidth },
+  // The chips scroll edge to edge, past the bar's padding.
+  filters: { marginHorizontal: -Spacing.two },
   inputWrap: {
     width: '100%',
     maxWidth: MaxContentWidth,

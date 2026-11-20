@@ -39,13 +39,13 @@ export interface AreaSummary {
   totalClimbs: number;
   isLeaf: boolean;
   isBoulder: boolean;
+  location: LatLng | null;
 }
 
 export interface Area extends AreaSummary {
   /** Ancestors from the country down to the parent. Excludes this area. */
   path: Crumb[];
   description: string | null;
-  location: LatLng | null;
   children: AreaSummary[];
   /** Sorted left to right when OpenBeta has an order, otherwise by name. */
   climbs: ClimbSummary[];
@@ -119,4 +119,6 @@ export interface SearchResults {
   climbs: Extract<SearchResult, { kind: 'climb' }>[];
   /** Which list holds the closest match, so it can be shown first. */
   best: 'areas' | 'climbs';
+  /** A grade filter checked only the best name matches, so some routes that match may be missing. */
+  partial?: boolean;
 }

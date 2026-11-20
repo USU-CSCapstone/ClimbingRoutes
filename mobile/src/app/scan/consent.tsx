@@ -8,6 +8,7 @@ import { AppText } from '@/ui/text';
 
 const POINTS = [
   'Your photos go to the ClimbingRoutes team, who make them into the wall’s 3D model and then delete them.',
+  'Once they’re uploaded, the scan is deleted from this phone, so look through it before you upload. Photos you picked from your library stay there.',
   'Where you stood is saved with each photo, so the team can find the wall.',
   'The finished model, with its routes drawn on, is shown to everyone in the app.',
   'Uploads wait for Wi-Fi unless you allow cellular on the Profile tab.',

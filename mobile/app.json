@@ -33,7 +33,13 @@
           "imageWidth": 76
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Shows walls and routes near you when you filter by distance."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

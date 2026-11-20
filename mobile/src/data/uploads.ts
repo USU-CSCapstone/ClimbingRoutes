@@ -26,6 +26,7 @@ const CONSENT_KEY = 'upload-consent';
 export type UploadProgress =
   | { state: 'waiting'; reason: 'sign-in' | 'wifi' | 'connection'; photos: number; bytes: number }
   | { state: 'uploading'; done: number; total: number; bytes: number }
+  | { state: 'finishing' }
   | { state: 'failed'; message: string };
 
 // Progress by scan id, for useUploadProgress().
@@ -77,8 +78,12 @@ export function startUpload(scanId: string) {
   kickUploads();
 }
 
-/** Stops queueing a scan and keeps its photos on the phone. Photos already uploaded are swept from the server later. */
+/**
+ * Stops queueing a scan and keeps its photos on the phone. Photos already uploaded are swept from the server later.
+ * Does nothing once the upload is finishing: by then the capture is being handed to the team.
+ */
 export function cancelUpload(scanId: string) {
+  if (finishing === scanId) return;
   const scan = readScan(scanId);
   if (scan) updateScan({ ...scan, status: 'draft', upload: undefined });
   setProgress(scanId, null);
@@ -86,7 +91,9 @@ export function cancelUpload(scanId: string) {
 
 let running = false;
 let again = false;
-let onUploaded: (() => void) | null = null;
+let onUploaded: (() => Promise<void>) | null = null;
+/** The scan whose capture is being marked uploaded, which can no longer be stopped (#76). */
+let finishing: string | null = null;
 /** Scans whose capture was started over this run. A second refusal stops instead of looping. */
 let restarted = new Set<string>();
 
@@ -192,18 +199,26 @@ async function upload(start: Scan) {
     // The manifest goes last, so the team PC never sees a capture without its photos.
     scan = save(scan);
     await put(`${folder}/${MANIFEST_FILE}`, new TextEncoder().encode(JSON.stringify(scan, null, 2)).buffer, 'application/json');
+    // Last chance to stop: a scan stopped while the manifest went up stays on the phone as a draft.
+    // From here on the capture goes to the team and the phone's copy is deleted, so Stop is refused.
+    if (readScan(scan.id)?.status !== 'uploading') throw new Stopped();
+    finishing = scan.id;
+    setProgress(scan.id, { state: 'finishing' });
     const { error } = await supabase
       .from('captures')
       .update({ status: 'uploaded', photo_count: scan.photos.length })
       .eq('id', scan.upload!.captureId);
     if (error) throw new Error(`Couldn't finish the upload: ${error.message}`);
 
+    // Fetch the account's captures first, so screens go from this scan to its capture without a gap.
+    await onUploaded?.();
     deleteScan(scan.id);
     setProgress(scan.id, null);
-    onUploaded?.();
   } catch (e) {
     if (e instanceof Stopped) setProgress(scan.id, null);
     else setProgress(scan.id, { state: 'failed', message: e instanceof Error ? e.message : String(e) });
+  } finally {
+    finishing = null;
   }
 }
 
