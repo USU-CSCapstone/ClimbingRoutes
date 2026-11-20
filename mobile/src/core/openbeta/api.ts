@@ -1,4 +1,5 @@
 // Area and climb lookups by uuid, mapped from OpenBeta's GraphQL shape to core types.
+import { type AreaStats, FILTER_TYPES } from '../filters';
 import { pickGrade } from '../grades';
 import type {
   Area,
@@ -57,7 +58,7 @@ interface ObAreaSummary {
   uuid: string;
   area_name: string;
   totalClimbs: number | null;
-  metadata: { leaf: boolean | null; isBoulder: boolean | null } | null;
+  metadata: { leaf: boolean | null; isBoulder: boolean | null; lat?: number | null; lng?: number | null } | null;
 }
 
 interface ObArea extends ObAreaSummary {
@@ -83,7 +84,7 @@ query Area($uuid: ID) {
     uuid area_name totalClimbs ancestors pathTokens
     content { description }
     metadata { leaf isBoulder lat lng }
-    children { uuid area_name totalClimbs metadata { leaf isBoulder } }
+    children { uuid area_name totalClimbs metadata { leaf isBoulder lat lng } }
     climbs { uuid name fa ${GRADES} ${TYPE} metadata { leftRightIndex } }
   }
 }`;
@@ -143,6 +144,46 @@ export async function fetchMapArea(uuid: Uuid, signal?: AbortSignal): Promise<Ma
   };
 }
 
+// Kept out of the area and map queries: for the whole USA it's 130 KB instead of 8 KB,
+// so it's only fetched while a grade or type filter is set.
+const CHILD_STATS_QUERY = `
+query ChildStats($uuid: ID) {
+  area(uuid: $uuid) {
+    children {
+      uuid
+      aggregate {
+        byGrade { label count }
+        byDiscipline { ${FILTER_TYPES.map((d) => `${d} { total }`).join(' ')} }
+      }
+    }
+  }
+}`;
+
+interface ObChildStats {
+  uuid: string;
+  aggregate: {
+    byGrade: { label: string; count: number }[] | null;
+    byDiscipline: Partial<Record<Discipline, { total: number | null } | null>> | null;
+  } | null;
+}
+
+/** Climb counts by grade and type for each of an area's children. */
+export async function fetchChildStats(uuid: Uuid, signal?: AbortSignal): Promise<Record<Uuid, AreaStats>> {
+  const { area } = await gql<{ area: { children: ObChildStats[] } | null }>(CHILD_STATS_QUERY, { uuid }, signal);
+  const stats: Record<Uuid, AreaStats> = {};
+  for (const c of area?.children ?? []) {
+    if (!c.aggregate) continue;
+    const byGrade: AreaStats['byGrade'] = {};
+    for (const g of c.aggregate.byGrade ?? []) byGrade[g.label] = (byGrade[g.label] ?? 0) + g.count;
+    const byType: AreaStats['byType'] = {};
+    for (const [d, v] of Object.entries(c.aggregate.byDiscipline ?? {})) {
+      if (v?.total) byType[d as Discipline] = v.total;
+    }
+    stats[c.uuid] = { byGrade, byType };
+  }
+  return stats;
+}
+
 export async function fetchArea(uuid: Uuid, signal?: AbortSignal): Promise<Area | null> {
   const { area } = await gql<{ area: ObArea | null }>(AREA_QUERY, { uuid }, signal);
   if (!area) return null;
@@ -180,6 +221,7 @@ function toAreaSummary(a: ObAreaSummary): AreaSummary {
     totalClimbs: a.totalClimbs ?? 0,
     isLeaf: a.metadata?.leaf ?? false,
     isBoulder: a.metadata?.isBoulder ?? false,
+    location: toLatLng(a.metadata?.lat, a.metadata?.lng),
   };
 }
 

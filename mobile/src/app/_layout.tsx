@@ -14,6 +14,8 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           {/* The scan flow covers the whole screen, tab bar included, and has its own Close button. */}
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
+          {/* One Filters sheet for every tab and the 3D viewer, so they all share the same filters. */}
+          <Stack.Screen name="filters" options={{ presentation: 'modal', headerShown: true }} />
         </Stack>
       </ThemeProvider>
     </QueryClientProvider>

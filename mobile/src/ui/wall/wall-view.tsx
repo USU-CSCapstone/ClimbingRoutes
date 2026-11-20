@@ -5,12 +5,15 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SerifFont, Spacing } from '@/constants/theme';
+import { hasFilters, matchesClimb } from '@/core/filters';
 import { modelUrl, type PublishedModel } from '@/core/models';
 import type { Uuid } from '@/core/types';
 import { wallRoutes } from '@/core/walls';
+import { useFilters } from '@/data/filters';
 import { useRouteLines } from '@/data/models';
 import { useArea } from '@/data/queries';
 import { useTheme } from '@/hooks/use-theme';
+import { FilterBar, openFilters } from '@/ui/filters';
 import { AppText } from '@/ui/text';
 import { ModelLayer, type ModelStatus, VIEWER_BACKGROUND } from '@/ui/wall/model-layer';
 import {
@@ -64,16 +67,35 @@ export function WallView({
   const [status, setStatus] = useState<ModelStatus>({ attempt: 0, percent: null, info: null, error: null });
   const [wholeWall, setWholeWall] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const filters = useFilters();
+  const filtered = hasFilters(filters);
 
   // A copy saved on the device counts, so a wall that has loaded once works offline.
   const linesKnown = saved.data !== undefined;
   // Wait for OpenBeta's order so each route keeps its number.
   const routes: ShownRoute[] = area.data
-    ? wallRoutes(area.data.climbs, saved.data ?? []).map((r) => ({ ...r, color: lineColor(r.grade) }))
+    ? wallRoutes(area.data.climbs, saved.data ?? []).map((r) => ({
+        ...r,
+        color: lineColor(r.grade),
+        // Distance doesn't apply here: this wall was picked already.
+        dimmed: filtered && !matchesClimb(r, filters),
+      }))
     : [];
+  const matching = routes.filter((r) => !r.dimmed).length;
+  const filterLabel = filtered ? `${matching} of ${routes.length} match` : 'Filters';
   const lines: ViewerRoute[] = routes.flatMap((r) =>
     r.line
-      ? [{ uuid: r.uuid, name: r.name, grade: r.grade, color: r.color, points: r.line.points, normals: r.line.normals }]
+      ? [
+          {
+            uuid: r.uuid,
+            name: r.name,
+            grade: r.grade,
+            color: r.color,
+            dimmed: r.dimmed,
+            points: r.line.points,
+            normals: r.line.normals,
+          },
+        ]
       : [],
   );
   const index = routes.findIndex((r) => r.uuid === selected);
@@ -162,6 +184,7 @@ export function WallView({
                   <AppText style={[styles.panelTitle, { fontFamily: SerifFont }]}>{wall.name}</AppText>
                   <FactChips facts={facts} />
                   <GradeSpread routes={routes} />
+                  <FilterBar style={styles.panelFilters} />
                   <AppText type="label" color="textSecondary" style={styles.listLabel}>
                     {routesMessage ?? 'Routes, left to right'}
                   </AppText>
@@ -171,6 +194,7 @@ export function WallView({
             />
           </View>
           <View style={styles.wideTools}>
+            <GlassButton icon="options-outline" label={filterLabel} onPress={openFilters} />
             <GlassButton icon="scan-outline" label="Whole wall" onPress={showWholeWall} />
           </View>
           {noticeChip ? (
@@ -220,7 +244,10 @@ export function WallView({
                   </AppText>
                 </View>
               ) : (
-                <GlassButton icon="list" label="All routes" onPress={() => setSheetOpen(true)} />
+                <>
+                  <GlassButton icon="list" label="All routes" onPress={() => setSheetOpen(true)} />
+                  <GlassButton icon="options-outline" label={filterLabel} onPress={openFilters} />
+                </>
               )}
               {noticeChip}
             </View>
@@ -284,6 +311,8 @@ const styles = StyleSheet.create({
   panelBack: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   panelTitle: { fontSize: 32, lineHeight: 38, marginTop: -Spacing.two },
   panelList: { paddingBottom: Spacing.four },
+  // The chips scroll edge to edge, past the header's padding.
+  panelFilters: { marginHorizontal: -Spacing.three },
   listLabel: { marginTop: Spacing.one },
   wideTools: { position: 'absolute', top: EDGE, right: EDGE, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   wideNotice: { position: 'absolute', right: EDGE, maxWidth: PANEL_WIDTH },

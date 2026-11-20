@@ -94,6 +94,10 @@ export function disciplineText(disciplines: Discipline[]): string {
   return disciplines.map((d) => DISCIPLINE_LABELS[d]).join(', ');
 }
 
+export function disciplineLabel(discipline: Discipline): string {
+  return DISCIPLINE_LABELS[discipline];
+}
+
 /** Tappable path back up the area hierarchy. */
 export function Breadcrumb({ path }: { path: Crumb[] }) {
   const hrefs = useHrefs();

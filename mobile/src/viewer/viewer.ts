@@ -364,7 +364,8 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
     clearGroup(state.group);
     const { points, normals } = state.route;
     const isHighlighted = state.route.uuid === highlighted;
-    const opacity = highlighted && !isHighlighted && (options.dimOthers ?? true) ? DIMMED : 1;
+    const faded = !isHighlighted && (state.route.dimmed || (highlighted && (options.dimOthers ?? true)));
+    const opacity = faded ? DIMMED : 1;
     if (isHighlighted && overlays.points) {
       for (const p of points) {
         const dot = new THREE.Sprite(dotMaterial);
@@ -633,7 +634,11 @@ export function createViewer(container: HTMLElement, options: ViewerOptions): Vi
 
   let frames = 0;
   let lastFps = performance.now();
+  const gl = renderer.getContext();
   renderer.setAnimationLoop(() => {
+    // The context can be lost a frame before three.js hears of it. Rendering then makes WebKit throw
+    // on the null shaders it gets back, so wait for three.js to restore it.
+    if (gl.isContextLost()) return;
     stepFlight(performance.now());
     controls?.update();
     renderer.render(scene, camera);
