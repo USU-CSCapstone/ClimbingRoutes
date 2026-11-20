@@ -89,26 +89,26 @@ export const V_STEPS: { label: string; value: number }[] = [
 
 /**
  * The filter steps a grade covers, low to high. 5.10 covers 5.10a–d, 5.10- is
- * a–b, 5.10+ is c–d, and V3-4 is V3–V4. Null for other systems or text it can't read.
+ * a–b, 5.10+ is c–d, 5.10a/b is a–b, and V3-4 and V3/4 are V3–V4. Null for other systems or text it can't read.
  */
 export function gradeSpan(grade: Grade | null): { system: 'yds' | 'vscale'; lo: number; hi: number } | null {
   if (!grade) return null;
   const text = grade.text.trim();
   if (grade.system === 'yds') {
-    const m = /^5\.(\d+)([abcd])?([+-](?!\d))?/i.exec(text);
+    const m = /^5\.(\d+)(?:([abcd])(?:\/([abcd]))?)?([+-](?!\d))?/i.exec(text);
     if (!m) return null;
     const base = Number(m[1]);
     if (base < 10) return { system: 'yds', lo: base, hi: base };
-    if (m[2]) {
-      const v = base + 'abcd'.indexOf(m[2].toLowerCase()) / 4;
-      return { system: 'yds', lo: v, hi: v };
-    }
-    if (m[3] === '-') return { system: 'yds', lo: base, hi: base + 0.25 };
-    if (m[3] === '+') return { system: 'yds', lo: base + 0.5, hi: base + 0.75 };
+    const letter = (l: string) => base + 'abcd'.indexOf(l.toLowerCase()) / 4;
+    // 5.10a/b covers both letters.
+    if (m[2]) return { system: 'yds', lo: letter(m[2]), hi: Math.max(letter(m[2]), letter(m[3] ?? m[2])) };
+    const sign = m[4];
+    if (sign === '-') return { system: 'yds', lo: base, hi: base + 0.25 };
+    if (sign === '+') return { system: 'yds', lo: base + 0.5, hi: base + 0.75 };
     return { system: 'yds', lo: base, hi: base + 0.75 };
   }
   if (grade.system === 'vscale') {
-    const m = /^V(B|\d+)(?:-(\d+))?/i.exec(text);
+    const m = /^V(B|\d+)(?:[-/]V?(\d+))?/i.exec(text);
     if (!m) return null;
     const lo = m[1].toUpperCase() === 'B' ? -1 : Number(m[1]);
     const hi = m[2] ? Math.max(lo, Number(m[2])) : lo;
