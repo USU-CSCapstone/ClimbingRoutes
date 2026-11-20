@@ -8,8 +8,14 @@ import type { Discipline, LatLng, SearchResults } from '../types';
 
 export const MIN_QUERY_LENGTH = 2;
 const LIMIT = 25;
-/** Grades are filtered here rather than by Typesense, so fetch more to still fill the list. */
-const LIMIT_WITH_GRADES = 100;
+/**
+ * Typesense can't filter on grade, so with a grade filter the name matches are
+ * checked here, a page at a time, up to GRADE_PAGES pages.
+ */
+const GRADE_PAGE = 250;
+const GRADE_PAGES = 8;
+/** How many name matches a grade filter checks before giving up. */
+export const GRADE_CHECK_LIMIT = GRADE_PAGE * GRADE_PAGES;
 
 /**
  * Type and distance filters go to Typesense. Distance applies to routes and
@@ -49,13 +55,16 @@ interface TsArea {
   totalClimbs: number;
 }
 
+interface TsHit {
+  document: unknown;
+  text_match: number;
+  text_match_info?: { typo_prefix_score: number };
+}
+
 interface TsResponse {
   results: {
-    hits?: {
-      document: unknown;
-      text_match: number;
-      text_match_info?: { typo_prefix_score: number };
-    }[];
+    hits?: TsHit[];
+    found?: number;
     error?: string;
   }[];
 }
@@ -75,35 +84,28 @@ async function searchTypesense(
   ];
   const ranges = rangesInUse(filters);
   const gradesOn = !!(ranges.yds || ranges.vscale);
-  const res = await fetch(`${TYPESENSE_URL}/multi_search`, {
-    method: 'POST',
-    headers: { 'X-TYPESENSE-API-KEY': TYPESENSE_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      searches: [
-        {
-          collection: 'areas',
-          q,
-          query_by: 'name',
-          filter_by: areaFilter.filter(Boolean).join(' && '),
-          sort_by: '_text_match:desc,totalClimbs:desc',
-          per_page: 10,
-        },
-        {
-          collection: 'climbs',
-          q,
-          query_by: 'climbName',
-          filter_by: climbFilter.filter(Boolean).join(' && '),
-          per_page: gradesOn ? LIMIT_WITH_GRADES : LIMIT,
-        },
-      ],
-    }),
+  const climbSearch = {
+    collection: 'climbs',
+    q,
+    query_by: 'climbName',
+    filter_by: climbFilter.filter(Boolean).join(' && '),
+    include_fields: 'climbUUID,climbName,grade,disciplines,areaNames',
+    per_page: gradesOn ? GRADE_PAGE : LIMIT,
+  };
+  const [areaResult, climbResult] = await multiSearch(
+    [
+      {
+        collection: 'areas',
+        q,
+        query_by: 'name',
+        filter_by: areaFilter.filter(Boolean).join(' && '),
+        sort_by: '_text_match:desc,totalClimbs:desc',
+        per_page: 10,
+      },
+      climbSearch,
+    ],
     signal,
-  });
-  if (!res.ok) throw new Error(`Typesense returned HTTP ${res.status}`);
-  const [areaResult, climbResult] = ((await res.json()) as TsResponse).results;
-  if (areaResult.error || climbResult.error) {
-    throw new Error(areaResult.error ?? climbResult.error);
-  }
+  );
 
   const areas = (areaResult.hits ?? []).map(({ document }) => {
     const a = document as TsArea;
@@ -118,30 +120,55 @@ async function searchTypesense(
 
   // The climbs collection has some duplicate documents for the same climb.
   const seen = new Set<string>();
-  const climbs = [];
-  for (const { document } of climbResult.hits ?? []) {
-    const c = document as TsClimb;
-    if (seen.has(c.climbUUID)) continue;
-    seen.add(c.climbUUID);
-    const disciplines = c.disciplines.map(toDiscipline);
-    const grade = gradeFromText(c.grade);
-    if (climbs.length >= LIMIT || !matchesClimb({ grade, disciplines }, filters)) continue;
-    climbs.push({
-      kind: 'climb' as const,
-      uuid: c.climbUUID,
-      name: c.climbName,
-      grade,
-      disciplines,
-      path: c.areaNames,
-    });
+  const climbs: SearchResults['climbs'] = [];
+  let topClimb: number | null = null;
+  const take = (hits: TsHit[] = []) => {
+    for (const { document, text_match } of hits) {
+      const c = document as TsClimb;
+      if (climbs.length >= LIMIT || seen.has(c.climbUUID)) continue;
+      seen.add(c.climbUUID);
+      const disciplines = c.disciplines.map(toDiscipline);
+      const grade = gradeFromText(c.grade);
+      if (!matchesClimb({ grade, disciplines }, filters)) continue;
+      topClimb ??= text_match;
+      climbs.push({ kind: 'climb', uuid: c.climbUUID, name: c.climbName, grade, disciplines, path: c.areaNames });
+    }
+  };
+  take(climbResult.hits);
+
+  // A narrow grade range on a common name can have no matches in the first page, so check further down.
+  const found = climbResult.found ?? 0;
+  let checked = gradesOn ? GRADE_PAGE : found;
+  if (gradesOn && climbs.length < LIMIT && found > GRADE_PAGE) {
+    const pages = Math.min(GRADE_PAGES, Math.ceil(found / GRADE_PAGE));
+    const rest = await Promise.all(
+      Array.from({ length: pages - 1 }, (_, i) => multiSearch([{ ...climbSearch, page: i + 2 }], signal)),
+    );
+    for (const [result] of rest) take(result.hits);
+    checked = pages * GRADE_PAGE;
   }
+  const partial = climbs.length < LIMIT && found > checked;
+
   // Areas go first when one matches the query exactly ("logan" → Logan Canyon).
   // Otherwise the better top hit wins ("hooked" → the route Hooked, not the area Mount Hooker).
   const topArea = areaResult.hits?.[0];
-  const topClimb = climbResult.hits?.[0];
   const exactArea = topArea?.text_match_info?.typo_prefix_score === 0;
-  const areasWin = !!topArea && (exactArea || topArea.text_match >= (topClimb?.text_match ?? 0));
-  return { areas, climbs, best: areasWin ? 'areas' : 'climbs' };
+  const areasWin = !!topArea && (exactArea || topArea.text_match >= (topClimb ?? 0));
+  return { areas, climbs, best: areasWin ? 'areas' : 'climbs', partial };
+}
+
+async function multiSearch(searches: object[], signal?: AbortSignal) {
+  const res = await fetch(`${TYPESENSE_URL}/multi_search`, {
+    method: 'POST',
+    headers: { 'X-TYPESENSE-API-KEY': TYPESENSE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ searches }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`Typesense returned HTTP ${res.status}`);
+  const { results } = (await res.json()) as TsResponse;
+  const failed = results.find((r) => r.error);
+  if (failed) throw new Error(failed.error);
+  return results;
 }
 
 function toDiscipline(d: string): Discipline {

@@ -42,9 +42,10 @@ export function hasFilters(f: RouteFilters): boolean {
 }
 
 /**
- * Whether a climb passes the type and grade filters. Grades in other systems,
- * like WI for ice, pass the grade ranges. A missing or unreadable YDS or V
- * grade fails the range for its kind of climb, since it can't be checked.
+ * Whether a climb passes the type and grade filters. With a grade range set,
+ * a YDS or V grade must fall in the range for its scale, so a route grade
+ * filter hides boulders. Grades in other systems, like WI for ice, pass. A
+ * missing or unreadable grade fails, since it can't be checked.
  */
 export function matchesClimb(climb: { grade: Grade | null; disciplines: Discipline[] }, f: RouteFilters): boolean {
   if (f.types.length > 0 && !climb.disciplines.some((d) => f.types.includes(d))) return false;
@@ -52,9 +53,9 @@ export function matchesClimb(climb: { grade: Grade | null; disciplines: Discipli
   if (!ranges.yds && !ranges.vscale) return true;
   if (climb.grade && climb.grade.system !== 'yds' && climb.grade.system !== 'vscale') return true;
   const span = gradeSpan(climb.grade);
-  if (!span) return !(climb.disciplines.includes('boulder') ? ranges.vscale : ranges.yds);
+  if (!span) return false;
   const range = ranges[span.system];
-  return !range || (span.hi >= range.min && span.lo <= range.max);
+  return !!range && span.hi >= range.min && span.lo <= range.max;
 }
 
 /** Climb counts for an area, from OpenBeta's aggregates. */
@@ -74,13 +75,10 @@ export function areaMayMatch(stats: AreaStats | null, f: RouteFilters): boolean 
   if (f.types.length > 0 && !f.types.some((t) => (stats.byType[t] ?? 0) > 0)) return false;
   const ranges = rangesInUse(f);
   if (!ranges.yds && !ranges.vscale) return true;
-  const roped = f.types.length === 0 || f.types.some((t) => t !== 'boulder');
-  const boulders = f.types.length === 0 || f.types.includes('boulder');
   return Object.entries(stats.byGrade).some(([label, count]) => {
     const span = count > 0 ? gradeSpan(gradeFromText(label)) : null;
-    if (!span || !(span.system === 'yds' ? roped : boulders)) return false;
-    const range = ranges[span.system];
-    return !range || (span.hi >= range.min && span.lo <= range.max);
+    const range = span ? ranges[span.system] : null;
+    return !!span && !!range && span.hi >= range.min && span.lo <= range.max;
   });
 }
 

@@ -119,4 +119,6 @@ export interface SearchResults {
   climbs: Extract<SearchResult, { kind: 'climb' }>[];
   /** Which list holds the closest match, so it can be shown first. */
   best: 'areas' | 'climbs';
+  /** A grade filter checked only the best name matches, so some routes that match may be missing. */
+  partial?: boolean;
 }
