@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { type Href, router } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { Display, SectionTitle } from '@/ui/home/kit';
+import { Display, NO_CLICK_FOCUS, Pressy, SectionTitle } from '@/ui/home/kit';
 import { AppText } from '@/ui/text';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -51,14 +52,17 @@ export function ScanSection() {
           </View>
         ))}
       </View>
-      {/* The photo tips page is #72. Until then this shows where its link will go. */}
-      <View style={[styles.tips, { backgroundColor: theme.backgroundElement }]}>
-        <Ionicons name="bulb-outline" size={20} color={theme.text} />
+      {/* How to take the photos, for people uploading their own. Only as wide as its words, centered under the steps. */}
+      <Pressy
+        role="button"
+        {...NO_CLICK_FOCUS}
+        hitSlop={6}
+        onPress={() => router.push('/photo-tips' as Href)}
+        style={[styles.tips, { backgroundColor: theme.backgroundElement }]}>
+        <Ionicons name="bulb-outline" size={18} color={theme.text} />
         <AppText style={styles.tipsTitle}>Photo tips</AppText>
-        <AppText type="small" color="textSecondary" style={styles.soon}>
-          Coming soon
-        </AppText>
-      </View>
+        <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+      </Pressy>
     </View>
   );
 }
@@ -76,7 +80,6 @@ const styles = StyleSheet.create({
   dot: { width: DOT, height: DOT, borderRadius: DOT / 2, alignItems: 'center', justifyContent: 'center' },
   stepTitle: { fontSize: 15, lineHeight: 19, letterSpacing: -0.3, textAlign: 'center' },
   stepDetail: { fontSize: 13, lineHeight: 17, textAlign: 'center' },
-  tips: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 52, borderRadius: 26, paddingHorizontal: Spacing.three + Spacing.half, marginTop: Spacing.three + Spacing.half, opacity: 0.6 },
-  tipsTitle: { fontSize: 15, fontWeight: '600' },
-  soon: { marginLeft: 'auto', fontSize: 13 },
+  tips: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: Spacing.two, height: 44, borderRadius: 22, paddingLeft: Spacing.three, paddingRight: Spacing.three - Spacing.one, marginTop: Spacing.three + Spacing.half },
+  tipsTitle: { fontSize: 14.5, lineHeight: 20, fontWeight: '600' },
 });
