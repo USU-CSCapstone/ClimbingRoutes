@@ -13,8 +13,8 @@ import { AppText } from '@/ui/text';
 /**
  * /scan/<wall>/upload: the upload lane, for photos taken outside the app. It goes
  * straight to picking them, from the phone's library or the computer, then on
- * to review (#52). How to take them is left to the photo tips on the landing
- * page, planned for a later milestone, so this only points there.
+ * to review (#52). How to take them is left to the photo tips page
+ * (/photo-tips), so this only links there.
  */
 export default function UploadScreen() {
   const { wall } = useLocalSearchParams<{ wall: string }>();
@@ -69,10 +69,12 @@ export default function UploadScreen() {
             <Ionicons name="bulb-outline" size={22} color={theme.text} />
             <AppText type="heading">For the best model</AppText>
           </View>
-          <AppText color="textSecondary">
-            How the photos are taken makes a big difference to the model. Tips on taking them are coming soon to our
-            website.
-          </AppText>
+          <AppText color="textSecondary">How the photos are taken makes a big difference to the model.</AppText>
+          {/* `from` has the tips page's last card lead back here rather than off to find a wall. */}
+          <ActionButton
+            label="See the photo tips"
+            onPress={() => router.push({ pathname: '/photo-tips', params: { from: 'upload' } })}
+          />
         </View>
       </ScrollView>
     </>
