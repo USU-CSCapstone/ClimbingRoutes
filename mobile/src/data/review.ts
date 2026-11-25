@@ -142,7 +142,11 @@ export function useApproveModel(model: WallModel) {
   });
 }
 
-/** Rejects a model with a note for the team, and removes its file from the review bucket. */
+/**
+ * Rejects a model with a note, and removes its file from the review bucket.
+ * The note is for the team and for whoever scanned the wall, whose Profile
+ * shows it as why their scan wasn't used.
+ */
 export function useRejectModel(model: WallModel) {
   const queryClient = useQueryClient();
   return useMutation({

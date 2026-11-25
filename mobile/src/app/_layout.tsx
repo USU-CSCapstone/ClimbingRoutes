@@ -16,6 +16,8 @@ export default function RootLayout() {
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
           {/* One Filters sheet for every tab and the 3D viewer, so they all share the same filters. */}
           <Stack.Screen name="filters" options={{ presentation: 'modal', headerShown: true }} />
+          {/* Opened by the gear on Profile. Outside the tabs, so it has its own header and way back. */}
+          <Stack.Screen name="account" options={{ headerShown: true, title: 'Account' }} />
         </Stack>
       </ThemeProvider>
     </QueryClientProvider>

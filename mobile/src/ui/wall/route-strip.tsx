@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import {
   FlatList,
@@ -10,13 +11,14 @@ import {
   View,
 } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
+import { Difficulty, Spacing } from '@/constants/theme';
 import type { Uuid } from '@/core/types';
+import { useClimbedRoutes } from '@/data/logbook';
 import { useTheme } from '@/hooks/use-theme';
 import { AppText } from '@/ui/text';
 import { GradePill, NumberBadge } from '@/ui/wall/parts';
 import { CARD_HEIGHT, RouteCard } from '@/ui/wall/route-card';
-import type { ShownRoute } from '@/ui/wall/types';
+import type { ShownRoute, WallInfo } from '@/ui/wall/types';
 
 export const PILL_HEIGHT = 46;
 const SIDE = Spacing.three;
@@ -37,11 +39,13 @@ export function stripHeight(cards: boolean): number {
  * card that comes to rest becomes the selected route.
  */
 export function RouteStrip({
+  wall,
   routes,
   index,
   linesKnown,
   onSelect,
 }: {
+  wall: WallInfo;
   routes: ShownRoute[];
   /** The selected route's place in `routes`, or -1. */
   index: number;
@@ -49,7 +53,7 @@ export function RouteStrip({
   onSelect: (uuid: Uuid | null) => void;
 }) {
   if (index < 0) return <RoutePills routes={routes} linesKnown={linesKnown} onSelect={onSelect} />;
-  return <RouteCards routes={routes} index={index} linesKnown={linesKnown} onSelect={onSelect} />;
+  return <RouteCards wall={wall} routes={routes} index={index} linesKnown={linesKnown} onSelect={onSelect} />;
 }
 
 function RoutePills({
@@ -62,13 +66,15 @@ function RoutePills({
   onSelect: (uuid: Uuid) => void;
 }) {
   const theme = useTheme();
+  // Routes the signed-in climber has done get a tick.
+  const climbed = new Set(useClimbedRoutes().data?.map((c) => c.climb_uuid));
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
       {routes.map((route) => (
         <Pressable
           key={route.uuid}
           role="button"
-          accessibilityLabel={`${route.number}. ${route.name}, ${route.grade?.text ?? 'no grade'}`}
+          accessibilityLabel={`${route.number}. ${route.name}, ${route.grade?.text ?? 'no grade'}${climbed.has(route.uuid) ? ', climbed' : ''}`}
           onPress={() => onSelect(route.uuid)}
           style={({ pressed }) => [
             styles.pill,
@@ -80,6 +86,7 @@ function RoutePills({
           <AppText numberOfLines={1} style={styles.pillName}>
             {route.name}
           </AppText>
+          {climbed.has(route.uuid) ? <Ionicons name="checkmark-circle" size={18} color={Difficulty[0].bar} /> : null}
           <GradePill grade={route.grade} />
         </Pressable>
       ))}
@@ -88,11 +95,13 @@ function RoutePills({
 }
 
 function RouteCards({
+  wall,
   routes,
   index,
   linesKnown,
   onSelect,
 }: {
+  wall: WallInfo;
   routes: ShownRoute[];
   index: number;
   linesKnown: boolean;
@@ -172,6 +181,7 @@ function RouteCards({
       renderItem={({ item, index: i }) => (
         <View style={{ width: interval }}>
           <RouteCard
+            wall={wall}
             route={item}
             index={i}
             total={routes.length}

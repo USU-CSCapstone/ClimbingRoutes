@@ -24,7 +24,7 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 
 ### Should have
 
-- Saved routes and recently viewed
+- Saved routes (done, with accounts: see Accounts and profiles) and recently viewed
 - Grades shown in the climber's preferred system (YDS, French, V-scale), and filtering by grade and type
 - **Offline:** download an area and use it with no signal. iOS and Android only; the web version stays online
 - Nearby crags and a map, using OpenBeta coordinates
@@ -38,6 +38,16 @@ Outdoor climbers, starting with single-pitch sport climbers. Boulderers come lat
 - Models download with their area for offline use
 - **Made by the team for now.** We photograph a wall, process it on the team PC with RealityScan ([ADR 0001](adr/0001-photogrammetry.md)), draw its routes, and publish it to the backend ([ADR 0006](adr/0006-supabase-backend.md)). Capture steps are in the [capture checklist](capture-checklist.md)
 - **Captured in the app.** Photos taken in the app upload for the team PC to process. The moderator account reviews each model, draws its routes and publishes or rejects it. A wall's page offers "View in 3D" once it has a published model
+
+### Accounts and profiles (#83)
+
+An account is optional: everything in the guide works signed out.
+
+- **Create account:** a username, an email and a password, in the app. Usernames are unique, 3 to 20 lowercase letters, numbers or underscores
+- **Save and Climbed:** a route's card on the 3D wall has a bookmark that saves it and "Climbed it", which marks it climbed today. The day can be changed afterwards, or the climb removed. The wall's route list marks both
+- **Profile tab:** three lists. Climbed: the routes by day, with how they spread across the grades. Saved: routes under the wall each is on. Scans: every scan sent and where it is, how many walls are in 3D because of them, and the reviewer's reason for any that weren't used
+- **Account:** change the username or password, and sign out
+- Profiles are private. Nobody sees another account's lists, the moderator included
 
 ### Photo capture and upload (Milestone 2, in progress)
 
@@ -98,5 +108,5 @@ How the pieces connect is in [architecture](architecture/README.md).
 - AR: preview a wall model on a table, or overlay routes on the real wall
 - Measurements from the model, such as route height and overhang angle
 - Gaussian splatting for more realistic views
-- Ticks, leaderboards and beta videos
+- Leaderboards and beta videos
 - Community uploads with moderation

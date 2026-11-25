@@ -191,6 +191,90 @@ async function run() {
   if (published) {
     await check("moderator: can't delete a published model", async () => blocked(await mod.from("wall_models").delete().eq("id", published.id).select()));
   }
+
+  // User profiles (#83): usernames
+  const tempName = `rls_${Date.now() % 1e9}`;
+  for (const [who, db] of [["signed out", anon], ["regular", user]]) {
+    await check(`${who}: is told an unused username is free`, async () => {
+      const free = must("ask", await db.rpc("username_available", { name: tempName }));
+      return free === true || `got ${free}`;
+    });
+  }
+  const nameBefore = must("read own profile", await user.from("profiles").select().single()).username;
+  try {
+    await check("regular: sets their own username", async () => {
+      const rows = must("set username", await user.from("profiles").update({ username: tempName }).eq("id", regular.id).select());
+      return rows[0]?.username === tempName || `got ${JSON.stringify(rows)}`;
+    });
+    await check("signed out: is told a username in use isn't free", async () => {
+      const free = must("ask", await anon.rpc("username_available", { name: tempName }));
+      return free === false || `got ${free}`;
+    });
+    await check("moderator: can't take a username in use", async () => {
+      const res = await mod.from("profiles").update({ username: tempName }).eq("id", moderator.id).select();
+      return res.error?.code === "23505" || `expected a duplicate error, got ${JSON.stringify(res.error ?? res.data)}`;
+    });
+    await check("regular: can't set a malformed username", async () => {
+      const res = await user.from("profiles").update({ username: "No" }).eq("id", regular.id).select();
+      return res.error?.code === "23514" || `expected a check error, got ${JSON.stringify(res.error ?? res.data)}`;
+    });
+    await check("regular: can't set someone else's username", async () =>
+      blocked(await user.from("profiles").update({ username: `${tempName}_x` }).eq("id", moderator.id).select()),
+    );
+  } finally {
+    must("put the username back", await user.from("profiles").update({ username: nameBefore }).eq("id", regular.id));
+  }
+
+  // Saved and climbed routes: each account's own, and nobody else's, the moderator included
+  const route = { climb_uuid: FIXTURE_WALL, wall_uuid: FIXTURE_WALL, name: "rls-check", grade: "5.8", wall_name: "rls-check wall" };
+  for (const table of ["saved_routes", "climbed_routes"]) {
+    const what = table === "saved_routes" ? "saved" : "climbed";
+    await check(`regular: adds a ${what} route`, async () => allowed(await user.from(table).insert(route)));
+    await check(`regular: can't add a ${what} route as someone else`, async () =>
+      blocked(await user.from(table).insert({ ...route, climb_uuid: crypto.randomUUID(), user_id: moderator.id }).select()),
+    );
+    await check(`regular: can't edit a ${what} route's name`, async () =>
+      blocked(await user.from(table).update({ name: "changed" }).eq("climb_uuid", FIXTURE_WALL).select()),
+    );
+    await check(`moderator: can't see other people's ${what} routes`, async () => blocked(await mod.from(table).select().eq("climb_uuid", FIXTURE_WALL)));
+    await check(`signed out: can't read ${what} routes`, async () => blocked(await anon.from(table).select().eq("climb_uuid", FIXTURE_WALL)));
+  }
+  await check("regular: changes the day of a climbed route", async () => {
+    const rows = must("change day", await user.from("climbed_routes").update({ climbed_on: "2026-01-02" }).eq("climb_uuid", FIXTURE_WALL).select());
+    return rows[0]?.climbed_on === "2026-01-02" || `got ${JSON.stringify(rows)}`;
+  });
+  await check("regular: can't move a climbed route into the future", async () =>
+    blocked(await user.from("climbed_routes").update({ climbed_on: "2999-01-01" }).eq("climb_uuid", FIXTURE_WALL).select()),
+  );
+  for (const table of ["saved_routes", "climbed_routes"]) {
+    await check(`regular: removes their own row from ${table}`, async () => {
+      const rows = must("remove", await user.from(table).delete().eq("climb_uuid", FIXTURE_WALL).select());
+      return rows.length === 1 || `removed ${rows.length} rows`;
+    });
+  }
+
+  // What became of a scan: the uploader reads the model made from their own capture, in any status
+  const fromCapture = must(
+    "add a model made from the regular account's capture",
+    await mod
+      .from("wall_models")
+      .insert({ wall_uuid: FIXTURE_WALL, version: 3, glb_path: `${FIXTURE_WALL}/v3.glb`, bytes: 4, source_capture: capture.id })
+      .select()
+      .single(),
+  );
+  await check("regular: sees the model made from their capture while it waits for review", async () => {
+    const rows = must("read", await user.from("wall_models").select().eq("id", fromCapture.id));
+    return (rows.length === 1 && rows[0].status === "needs_review") || `got ${JSON.stringify(rows)}`;
+  });
+  must("reject it", await mod.from("wall_models").update({ status: "rejected", review_note: "rls-check reason" }).eq("id", fromCapture.id));
+  await check("regular: sees it was rejected, and why", async () => {
+    const rows = must("read", await user.from("wall_models").select().eq("id", fromCapture.id));
+    return (rows[0]?.status === "rejected" && rows[0].review_note === "rls-check reason") || `got ${JSON.stringify(rows)}`;
+  });
+  await check("regular: can't change the model made from their capture", async () =>
+    blocked(await user.from("wall_models").update({ review_note: "changed" }).eq("id", fromCapture.id).select()),
+  );
+  await check("signed out: can't see a rejected model", async () => blocked(await anon.from("wall_models").select().eq("id", fromCapture.id)));
 }
 
 /** Passes if the call was refused: an expected denial error, or no rows because RLS hid them. */
@@ -226,6 +310,10 @@ async function addFixtureModel(version) {
 
 /** Removes everything under the fixture wall, from this run or an earlier one that crashed. */
 async function cleanup() {
+  // Each account's own rows: nobody else can remove them, the moderator included.
+  for (const db of [user, mod]) {
+    for (const table of ["saved_routes", "climbed_routes"]) must(`clear fixture ${table}`, await db.from(table).delete().eq("wall_uuid", FIXTURE_WALL));
+  }
   const captures = must("list fixture captures", await mod.from("captures").select().eq("wall_uuid", FIXTURE_WALL));
   for (const c of captures) {
     const folder = `${c.captured_by}/${c.id}`;

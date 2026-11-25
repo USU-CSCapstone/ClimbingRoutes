@@ -1,258 +1,133 @@
+import type { Session } from '@supabase/supabase-js';
+import { router, useIsFocused } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MaxContentWidth, Spacing, TapTarget } from '@/constants/theme';
-import type { Capture } from '@/core/database';
-import type { Scan } from '@/core/capture';
-import { useProfile, useSession, useSignIn, useSignOut } from '@/data/auth';
-import { useMyCaptures } from '@/data/captures';
-import { useArea } from '@/data/queries';
-import { useScans } from '@/data/scans';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { monthAndYear } from '@/core/days';
+import { useProfile, useSession } from '@/data/auth';
+import { useMyScans } from '@/data/captures';
+import { useClimbedRoutes, useSavedRoutes } from '@/data/logbook';
 import { supabaseConfigured } from '@/data/supabase';
-import { allowsCellular, setAllowsCellular, useUploadProgress } from '@/data/uploads';
 import { useTheme } from '@/hooks/use-theme';
-import { LinkRow, Loading, Message } from '@/ui/components';
-import { CAPTURE_STATUS, uploadText } from '@/ui/scan/upload-status';
+import { Loading, Message } from '@/ui/components';
+import { SHEET_OVERLAP } from '@/ui/home/hero';
+import { ClimbedTab } from '@/ui/profile/climbed';
+import { GUTTER, WIDE } from '@/ui/profile/kit';
+import { SavedTab } from '@/ui/profile/saved';
+import { ScansTab } from '@/ui/profile/scans';
+import { SignedOut } from '@/ui/profile/signed-out';
+import { type ProfileTab, ProfileTabs } from '@/ui/profile/tabs';
+import { ProfileTop } from '@/ui/profile/top';
+import { ActionButton } from '@/ui/scan/controls';
 import { AppText } from '@/ui/text';
+import { VIEWER_BACKGROUND } from '@/ui/wall/model-layer';
 
+/** Dark kept behind the top of the page on a phone, which is what shows when the page is pulled down. */
+const PULL_ROOM = 220;
+
+/**
+ * The Profile tab (#83). Signed in: who you are, then what you've climbed,
+ * the routes you've saved and the scans you've sent, as three tabs. Signed
+ * out: what an account is for, and the ways in. Either way the top is dark,
+ * like Home's, in both themes.
+ */
 export default function ProfileScreen() {
+  const theme = useTheme();
+  const safe = useSafeAreaInsets();
+  const focused = useIsFocused();
+  const screen = useWindowDimensions();
+  const wide = screen.width >= WIDE;
   const { session, loading } = useSession();
 
-  let body;
-  if (!supabaseConfigured) {
-    body = (
-      <Message
-        title="Accounts aren't set up yet"
-        detail="Add the Supabase project URL and publishable key to src/core/config.ts."
-      />
+  if (!supabaseConfigured || loading) {
+    return (
+      <View style={[styles.flex, { paddingTop: safe.top }]}>
+        {supabaseConfigured ? (
+          <Loading />
+        ) : (
+          <Message title="Accounts aren't set up yet" detail="Add the Supabase project URL and publishable key to src/core/config.ts." />
+        )}
+      </View>
     );
-  } else if (loading) {
-    body = <Loading />;
-  } else if (session) {
-    body = <SignedIn email={session.user.email ?? 'Signed in'} userId={session.user.id} />;
-  } else {
-    body = <SignInForm />;
   }
 
   return (
-    <SafeAreaView style={styles.flex} edges={['top']}>
+    <View style={[styles.flex, { backgroundColor: theme.background }]}>
+      {focused ? <StatusBar style="light" /> : null}
+      <View style={[styles.statusStrip, { height: safe.top }]} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {body}
+        {wide ? null : <View pointerEvents="none" style={styles.pullRoom} />}
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.grow}>
+          {session ? <SignedIn session={session} width={screen.width} wide={wide} /> : <SignedOut width={screen.width} wide={wide} />}
+        </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
-function SignedIn({ email, userId }: { email: string; userId: string }) {
-  const signOut = useSignOut();
+function SignedIn({ session, width, wide }: { session: Session; width: number; wide: boolean }) {
+  const theme = useTheme();
   const { profile, error, refetch } = useProfile();
-  return (
-    <View style={styles.page}>
-      <ScrollView style={styles.flex} contentContainerStyle={styles.scroll}>
-        <AppText type="title">Profile</AppText>
-        <AppText color="textSecondary">Signed in as {email}</AppText>
-        {error ? (
-          <View style={styles.notice}>
-            <AppText color="danger">{error.message}</AppText>
-            <Button label="Try again" onPress={() => refetch()} secondary />
-          </View>
-        ) : null}
-        {profile?.is_moderator ? (
-          Platform.OS === 'web' ? (
-            <View style={styles.tools}>
-              <LinkRow href="/moderate" title="Moderator tools" subtitle="Review models and draw routes" />
-            </View>
-          ) : (
-            <AppText type="small" color="textSecondary" style={styles.notice}>
-              Moderator tools are in the web app. Open it in a browser on a laptop.
-            </AppText>
-          )
-        ) : null}
-        {Platform.OS === 'web' ? null : <UploadSettings />}
-        <YourScans userId={userId} />
-      </ScrollView>
-      {signOut.error ? <AppText color="danger">{signOut.error.message}</AppText> : null}
-      <Button label="Sign out" busy={signOut.isPending} onPress={() => signOut.mutate()} secondary />
-    </View>
-  );
-}
+  const [tab, setTab] = useState<ProfileTab>('climbed');
+  const counts = {
+    climbed: useClimbedRoutes().data?.length,
+    saved: useSavedRoutes().data?.length,
+    scans: useMyScans(session.user.id).data?.length,
+  };
+  // An account from before usernames goes by the start of its email until it picks one.
+  const name = profile?.username ?? session.user.email?.split('@')[0] ?? 'You';
 
-function UploadSettings() {
-  const [cellular, setCellular] = useState(allowsCellular);
+  const body = (
+    <>
+      {error ? (
+        <View style={styles.notice}>
+          <AppText color="danger">{error.message}</AppText>
+          <ActionButton icon="refresh" label="Try again" onPress={() => refetch()} />
+        </View>
+      ) : null}
+      <ProfileTabs value={tab} counts={counts} onChange={setTab} />
+      {tab === 'climbed' ? <ClimbedTab wide={wide} /> : tab === 'saved' ? <SavedTab /> : <ScansTab />}
+    </>
+  );
   return (
-    <View style={styles.setting}>
-      <View style={styles.flex}>
-        <AppText>Upload scans over cellular</AppText>
-        <AppText type="small" color="textSecondary">
-          {cellular ? 'Uploads start on any connection' : 'Uploads wait for Wi-Fi. A scan is 50–200 MB'}
-        </AppText>
-      </View>
-      <Switch
-        value={cellular}
-        onValueChange={(on) => {
-          setCellular(on);
-          setAllowsCellular(on);
-        }}
+    <>
+      <ProfileTop
+        width={width}
+        wide={wide}
+        name={name}
+        joined={profile ? monthAndYear(profile.created_at) : null}
+        prompt={profile && !profile.username ? 'Pick a username' : undefined}
+        onAccount={() => router.push('/account')}
       />
-    </View>
-  );
-}
-
-/** Scans uploading from this phone, then this account's uploaded ones and where each is. */
-function YourScans({ userId }: { userId: string }) {
-  const uploading = useScans().filter((s) => s.status === 'uploading');
-  const captures = useMyCaptures(userId);
-  if (!uploading.length && !captures.data?.length && !captures.error) return null;
-  return (
-    <View style={styles.scans}>
-      <AppText type="label" color="textSecondary">
-        Your scans
-      </AppText>
-      {uploading.map((scan) => (
-        <UploadingRow key={scan.id} scan={scan} />
-      ))}
-      {captures.error ? <AppText color="danger">{captures.error.message}</AppText> : null}
-      {captures.data?.map((capture) => (
-        <CaptureRow key={capture.id} capture={capture} />
-      ))}
-    </View>
-  );
-}
-
-function UploadingRow({ scan }: { scan: Scan }) {
-  const progress = useUploadProgress(scan.id);
-  return <ScanRow wallUuid={scan.wallUuid} status={uploadText(progress)} failed={progress?.state === 'failed'} />;
-}
-
-function CaptureRow({ capture }: { capture: Capture }) {
-  const reason = capture.status === 'failed' && capture.failure_reason ? `: ${capture.failure_reason}` : '';
-  return <ScanRow wallUuid={capture.wall_uuid} status={CAPTURE_STATUS[capture.status] + reason} failed={capture.status === 'failed'} />;
-}
-
-function ScanRow({ wallUuid, status, failed }: { wallUuid: string; status: string; failed: boolean }) {
-  const theme = useTheme();
-  const area = useArea(wallUuid);
-  return (
-    <View style={[styles.scanRow, { borderBottomColor: theme.border }]}>
-      <AppText style={styles.bold}>{area.data?.name ?? 'Wall'}</AppText>
-      <AppText type="small" color={failed ? 'danger' : 'textSecondary'}>
-        {status}
-      </AppText>
-    </View>
-  );
-}
-
-function SignInForm() {
-  const theme = useTheme();
-  const signIn = useSignIn();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const ready = email.trim() !== '' && password !== '' && !signIn.isPending;
-  const submit = () => ready && signIn.mutate({ email, password });
-  const input = [styles.input, { color: theme.text, backgroundColor: theme.backgroundElement }];
-
-  return (
-    <View style={styles.page}>
-      <View style={styles.flex}>
-        <AppText type="title">Sign in</AppText>
-        <AppText color="textSecondary">Team accounts only for now. You can browse without one.</AppText>
-      </View>
-      <View style={styles.form}>
-        <TextInput
-          value={email}
-          onChangeText={(text) => {
-            setEmail(text);
-            signIn.reset();
-          }}
-          placeholder="Email"
-          placeholderTextColor={theme.textSecondary}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          keyboardType="email-address"
-          textContentType="username"
-          returnKeyType="next"
-          style={input}
-        />
-        <TextInput
-          value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            signIn.reset();
-          }}
-          placeholder="Password"
-          placeholderTextColor={theme.textSecondary}
-          secureTextEntry
-          autoComplete="current-password"
-          textContentType="password"
-          returnKeyType="go"
-          onSubmitEditing={submit}
-          style={input}
-        />
-        {signIn.error ? <AppText color="danger">{signIn.error.message}</AppText> : null}
-        <Button label="Sign in" busy={signIn.isPending} disabled={!ready} onPress={submit} />
-      </View>
-    </View>
-  );
-}
-
-function Button({
-  label,
-  onPress,
-  busy,
-  disabled,
-  secondary,
-}: {
-  label: string;
-  onPress: () => void;
-  busy?: boolean;
-  disabled?: boolean;
-  secondary?: boolean;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      role="button"
-      onPress={onPress}
-      disabled={disabled || busy}
-      style={({ pressed }) => [
-        styles.button,
-        secondary
-          ? { borderColor: theme.border, borderWidth: StyleSheet.hairlineWidth * 2 }
-          : { backgroundColor: theme.accent },
-        (disabled || busy) && styles.disabled,
-        pressed && styles.pressed,
-      ]}>
-      <AppText style={[styles.buttonText, { color: secondary ? theme.text : theme.accentText }]}>
-        {busy ? '…' : label}
-      </AppText>
-    </Pressable>
+      {wide ? (
+        <View style={[styles.wideBody, { backgroundColor: theme.background }]}>
+          <View style={styles.column}>{body}</View>
+        </View>
+      ) : (
+        <View style={[styles.sheet, { backgroundColor: theme.background }]}>{body}</View>
+      )}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  // Controls sit at the bottom so they're reachable one-handed.
-  page: {
+  grow: { flexGrow: 1 },
+  statusStrip: { backgroundColor: VIEWER_BACKGROUND },
+  pullRoom: { position: 'absolute', top: 0, left: 0, right: 0, height: PULL_ROOM, backgroundColor: VIEWER_BACKGROUND },
+  // Rounded where it rides up over the dark top.
+  sheet: {
     flex: 1,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    padding: Spacing.three,
-    gap: Spacing.three,
+    marginTop: -SHEET_OVERLAP,
+    borderTopLeftRadius: SHEET_OVERLAP,
+    borderTopRightRadius: SHEET_OVERLAP,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.five,
   },
-  form: { gap: Spacing.two },
-  tools: { marginTop: Spacing.three, marginHorizontal: -Spacing.three },
-  notice: { marginTop: Spacing.three, gap: Spacing.two },
-  scroll: { gap: Spacing.one, paddingBottom: Spacing.three },
-  setting: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, marginTop: Spacing.four, minHeight: TapTarget },
-  scans: { marginTop: Spacing.four, gap: Spacing.one },
-  scanRow: { paddingVertical: Spacing.two, borderBottomWidth: StyleSheet.hairlineWidth, gap: Spacing.half },
-  bold: { fontWeight: '600' },
-  input: { minHeight: TapTarget, borderRadius: 12, paddingHorizontal: Spacing.three, fontSize: 18 },
-  button: { minHeight: TapTarget, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontWeight: '700' },
-  disabled: { opacity: 0.5 },
-  pressed: { opacity: 0.8 },
+  wideBody: { flex: 1, paddingTop: Spacing.two, paddingBottom: Spacing.five },
+  column: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
+  notice: { paddingHorizontal: GUTTER, paddingVertical: Spacing.three, gap: Spacing.two },
 });

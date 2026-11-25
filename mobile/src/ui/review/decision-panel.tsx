@@ -60,6 +60,10 @@ export function DecisionPanel({
             multiline
             style={[styles.note, { color: theme.text, backgroundColor: theme.backgroundElement }]}
           />
+          {/* Their Profile shows it under the scan, as why it wasn't used. */}
+          <AppText type="small" color="textSecondary">
+            Whoever scanned the wall will see this.
+          </AppText>
           <ActionButton
             icon="close-circle-outline"
             label={reject.isPending ? 'Rejecting…' : 'Reject model'}

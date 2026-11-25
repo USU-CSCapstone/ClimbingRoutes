@@ -94,7 +94,7 @@ export function RoutesSheet({
             </View>
             <RoundButton icon="close" label="Close all routes" onPress={dismiss} />
           </View>
-          <FactChips facts={facts} />
+          <FactChips facts={facts} routes={routes} />
           <GradeSpread routes={routes} />
           <FilterBar style={styles.filters} />
         </View>

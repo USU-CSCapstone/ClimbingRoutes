@@ -10,9 +10,48 @@ export type Database = {
   public: {
     Tables: {
       profiles: {
-        Row: { id: string; is_moderator: boolean; created_at: string };
+        Row: { id: string; is_moderator: boolean; created_at: string; username: string | null };
         Insert: never;
+        /** The username is the only thing an account can change about itself. */
+        Update: { username?: string };
+        Relationships: [];
+      };
+      saved_routes: {
+        Row: {
+          user_id: string;
+          climb_uuid: string;
+          wall_uuid: string;
+          name: string;
+          grade: string | null;
+          wall_name: string;
+          created_at: string;
+        };
+        /** The account is filled in by the database. */
+        Insert: { climb_uuid: string; wall_uuid: string; name: string; grade?: string | null; wall_name: string };
         Update: never;
+        Relationships: [];
+      };
+      climbed_routes: {
+        Row: {
+          user_id: string;
+          climb_uuid: string;
+          wall_uuid: string;
+          name: string;
+          grade: string | null;
+          wall_name: string;
+          /** The day it was climbed, as YYYY-MM-DD on the climber's own calendar. */
+          climbed_on: string;
+          created_at: string;
+        };
+        Insert: {
+          climb_uuid: string;
+          wall_uuid: string;
+          name: string;
+          grade?: string | null;
+          wall_name: string;
+          climbed_on?: string;
+        };
+        Update: { climbed_on?: string };
         Relationships: [];
       };
       captures: {
@@ -103,6 +142,7 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       is_moderator: { Args: Record<PropertyKey, never>; Returns: boolean };
+      username_available: { Args: { name: string }; Returns: boolean };
     };
     Enums: {
       capture_status: 'uploading' | 'uploaded' | 'processing' | 'processed' | 'failed';
@@ -117,5 +157,7 @@ export type Profile = Tables['profiles']['Row'];
 export type Capture = Tables['captures']['Row'];
 export type WallModel = Tables['wall_models']['Row'];
 export type RouteLine = Tables['route_lines']['Row'];
+export type SavedRoute = Tables['saved_routes']['Row'];
+export type ClimbedRoute = Tables['climbed_routes']['Row'];
 export type CaptureStatus = Database['public']['Enums']['capture_status'];
 export type ModelStatus = Database['public']['Enums']['model_status'];

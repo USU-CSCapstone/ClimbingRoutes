@@ -182,7 +182,7 @@ export function WallView({
                     </AppText>
                   </View>
                   <AppText style={[styles.panelTitle, { fontFamily: SerifFont }]}>{wall.name}</AppText>
-                  <FactChips facts={facts} />
+                  <FactChips facts={facts} routes={routes} />
                   <GradeSpread routes={routes} />
                   <FilterBar style={styles.panelFilters} />
                   <AppText type="label" color="textSecondary" style={styles.listLabel}>
@@ -204,6 +204,7 @@ export function WallView({
           ) : null}
           {selectedRoute ? (
             <RouteCard
+              wall={wall}
               route={selectedRoute}
               index={index}
               total={routes.length}
@@ -251,7 +252,7 @@ export function WallView({
               )}
               {noticeChip}
             </View>
-            <RouteStrip routes={routes} index={index} linesKnown={linesKnown} onSelect={onSelect} />
+            <RouteStrip wall={wall} routes={routes} index={index} linesKnown={linesKnown} onSelect={onSelect} />
           </View>
           {sheetOpen ? (
             <RoutesSheet

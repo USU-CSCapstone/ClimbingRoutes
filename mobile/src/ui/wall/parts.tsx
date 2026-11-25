@@ -13,6 +13,7 @@ import {
 import { Colors, Difficulty, Spacing, TapTarget, UngradedLine } from '@/constants/theme';
 import { difficultyBand, gradeValue } from '@/core/grades';
 import type { Area, Grade, Uuid } from '@/core/types';
+import { useClimbedRoutes, useSavedRoutes } from '@/data/logbook';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { climbCount, disciplineText } from '@/ui/components';
@@ -98,8 +99,16 @@ export function wallFacts(routes: ShownRoute[], linesKnown: boolean): string[] {
   return facts;
 }
 
-export function FactChips({ facts }: { facts: string[] }) {
+/**
+ * The wall's facts as chips. Given the wall's routes too, it adds how many of
+ * them the signed-in climber has done, once that's at least one.
+ */
+export function FactChips({ facts, routes }: { facts: string[]; routes?: ShownRoute[] }) {
   const theme = useTheme();
+  const dark = useColorScheme() === 'dark';
+  const climbed = new Set(useClimbedRoutes().data?.map((c) => c.climb_uuid));
+  const done = routes?.filter((r) => climbed.has(r.uuid)).length ?? 0;
+  const green = Difficulty[0][dark ? 'dark' : 'light'];
   return (
     <View style={styles.chips}>
       {facts.map((fact) => (
@@ -107,6 +116,14 @@ export function FactChips({ facts }: { facts: string[] }) {
           <AppText type="small">{fact}</AppText>
         </View>
       ))}
+      {routes && done ? (
+        <View style={[styles.chip, styles.mine, { backgroundColor: green.bg }]}>
+          <Ionicons name="checkmark" size={14} color={green.text} />
+          <AppText type="small" style={[styles.mineText, { color: green.text }]}>
+            {`${done} of ${routes.length} climbed`}
+          </AppText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -116,8 +133,8 @@ const BAND_LABELS = {
   vscale: ['V0 to V2', 'V3 to V5', 'V6 to V8', 'V9 and up'],
 };
 
-/** How many routes fall in each difficulty band, as a small bar chart. */
-export function GradeSpread({ routes }: { routes: ShownRoute[] }) {
+/** How many routes fall in each difficulty band, as a small bar chart. Only their grades are read. */
+export function GradeSpread({ routes }: { routes: { grade: Grade | null }[] }) {
   const theme = useTheme();
   const counts = [0, 0, 0, 0];
   let boulders = 0;
@@ -251,6 +268,9 @@ export function RouteList({
       },
   );
   const index = routes.findIndex((r) => r.uuid === selected);
+  // What the signed-in climber has done and saved, marked on each row.
+  const climbed = new Set(useClimbedRoutes().data?.map((c) => c.climb_uuid));
+  const saved = new Set(useSavedRoutes().data?.map((s) => s.climb_uuid));
 
   useEffect(() => {
     if (index < 0 || !selected || visible.current.has(selected)) return;
@@ -263,7 +283,8 @@ export function RouteList({
       ref={list}
       data={routes}
       keyExtractor={(r) => r.uuid}
-      extraData={selected}
+      // Rows are redrawn when the selection or a mark changes.
+      extraData={`${selected} ${[...climbed]} ${[...saved]}`}
       onViewableItemsChanged={onViewableItemsChanged}
       viewabilityConfig={VIEWABILITY}
       onScrollToIndexFailed={({ index: failed }) => {
@@ -274,7 +295,14 @@ export function RouteList({
       }}
       ListHeaderComponent={header}
       renderItem={({ item }) => (
-        <RouteRow route={item} selected={item.uuid === selected} onPress={onPress} linesKnown={linesKnown} />
+        <RouteRow
+          route={item}
+          selected={item.uuid === selected}
+          onPress={onPress}
+          linesKnown={linesKnown}
+          climbed={climbed.has(item.uuid)}
+          saved={saved.has(item.uuid)}
+        />
       )}
       contentContainerStyle={contentContainerStyle}
     />
@@ -289,11 +317,15 @@ function RouteRow({
   selected,
   onPress,
   linesKnown,
+  climbed,
+  saved,
 }: {
   route: ShownRoute;
   selected: boolean;
   onPress: (uuid: Uuid) => void;
   linesKnown: boolean;
+  climbed: boolean;
+  saved: boolean;
 }) {
   const theme = useTheme();
   const status = route.line ? 'In 3D' : linesKnown ? 'Not drawn yet' : null;
@@ -302,7 +334,7 @@ function RouteRow({
     <Pressable
       role="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={[`${route.number}. ${route.name}`, route.grade?.text ?? 'no grade', status?.toLowerCase()]
+      accessibilityLabel={[`${route.number}. ${route.name}`, route.grade?.text ?? 'no grade', status?.toLowerCase(), climbed && 'climbed', saved && 'saved']
         .filter(Boolean)
         .join(', ')}
       onPress={() => onPress(route.uuid)}
@@ -327,6 +359,8 @@ function RouteRow({
             {details}
           </AppText>
         </View>
+        {climbed ? <Ionicons name="checkmark-circle" size={20} color={Difficulty[0].bar} /> : null}
+        {saved ? <Ionicons name="bookmark" size={18} color={theme.accent} /> : null}
         <GradePill grade={route.grade} />
       </View>
     </Pressable>
@@ -343,6 +377,8 @@ const styles = StyleSheet.create({
   pillTextLarge: { fontSize: 17, lineHeight: 22 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one + Spacing.half },
   chip: { paddingHorizontal: Spacing.two + Spacing.half, paddingVertical: Spacing.half, borderRadius: 12 },
+  mine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  mineText: { fontWeight: '700' },
   spread: { gap: Spacing.one },
   spreadRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   spreadLabel: { width: 104 },

@@ -1,6 +1,6 @@
 # Supabase
 
-The backend for wall models: accounts, the capture job queue, model versions, route lines and file storage. Free plan.
+The backend for accounts and wall models: profiles, saved and climbed routes, the capture job queue, model versions, route lines and file storage. Free plan.
 
 - `migrations/`: tables, statuses, row-level security and storage buckets
 - `seed.mjs`: publishes `data/models/wall47.glb` and its lines as Date Wall v1
@@ -19,7 +19,10 @@ The backend for wall models: accounts, the capture job queue, model versions, ro
 | Remove files from `models` | – | – | only of unpublished models | all |
 | Captures, their photos and `scan.json` | – | own: start, upload while uploading, mark uploaded, cancel while uploading | read and delete any | all |
 | Claim an uploaded capture (`claim_capture()`) | – | – | – | yes |
-| Profiles | – | read own | read all | all |
+| Models made from your own captures, in any status, with the review note | – | read | read | all |
+| Profiles | – | read own, set own username | read all, set own username | all |
+| Ask whether a username is free (`username_available()`) | yes | yes | yes | yes |
+| Saved routes and climbed routes | – | own: read, add, remove, and change the day of a climbed route | own only, like anyone | all |
 
 Also enforced in the database:
 
@@ -27,6 +30,8 @@ Also enforced in the database:
 - Review status only goes `needs_review` → `published` or `rejected`, once, and records who reviewed it and when
 - A model can't be published until its file is in `models`
 - `is_moderator` can only be changed in SQL
+- A username is 3 to 20 lowercase letters, numbers or underscores, and no two accounts share one. Sign-up sends it with the email and password; one that's taken or malformed still makes the account, without a username
+- A climbed route's day can't be in the future, and nothing else about a saved or climbed route can be edited
 
 Paths: photos at `captures/<user id>/<capture id>/<file>`, models at `review/` or `models/` + `<wall uuid>/v<N>.glb`.
 
@@ -35,7 +40,7 @@ Paths: photos at `captures/<user id>/<capture id>/<file>`, models at `review/` o
 The team's project already exists. These steps are for making a new one; to work with the existing one, see [docs/setup.md](../docs/setup.md#backend).
 
 1. Create a project at [database.new](https://database.new) on the free plan, in an Americas region
-2. **Authentication → Sign In / Providers → Email:** turn off **Allow new users to sign up** and **Confirm email**
+2. **Authentication → Sign In / Providers → Email:** turn off **Confirm email**. **Allow new users to sign up** decides whether the app's Create account works: off keeps accounts team-only (the app then says new accounts aren't open yet), on lets anyone make one
 3. **Authentication → Users → Add user → Create new user** for each account, with **Auto Confirm User** checked:
    - each of your personal accounts
    - the shared moderator account, such as a `+moderator` alias of a team inbox
@@ -62,7 +67,7 @@ The team's project already exists. These steps are for making a new one; to work
 
 ## Test plan
 
-`npm run check` signs in signed-out, as `REGULAR_EMAIL` and as the moderator. It runs 53 checks, makes its own fixtures under a made-up wall, and removes them afterwards. It exits non-zero if anything fails. Run it after every migration. It covers:
+`npm run check` signs in signed-out, as `REGULAR_EMAIL` and as the moderator. It runs 78 checks, makes its own fixtures under a made-up wall, and removes them afterwards. It exits non-zero if anything fails. Run it after every migration. It covers:
 
 - **Signed out and regular:** can't see unpublished models, their route lines or `review` files. Can't add model rows, upload to `models` or `review`, see anyone else's captures or photos, or claim captures
 - **Regular:**
@@ -70,6 +75,10 @@ The team's project already exists. These steps are for making a new one; to work
   - Can't change a model's review status, or add, edit or delete route lines
   - Can start their own capture and upload photos and `scan.json` to it, but not into anyone else's capture, and can't overwrite photos
   - Can't set `processing` or a failure reason. Once marked uploaded, can't change the capture, add photos or delete it
+  - Sets their own username, but not one in use, a malformed one, or anyone else's
+  - Adds, reads and removes their own saved and climbed routes, changes a climbed route's day but not into the future, and can't add one as someone else
+  - Sees the model made from their own capture while it waits for review and after it's rejected, with the reason, and can't change it
+- **Signed out and moderator:** can't read anyone else's saved or climbed routes
 - **Moderator:**
   - Sees unpublished models and every capture, and downloads from `review`
   - Rejecting a model records who and when, and the decision can't be changed afterwards
@@ -78,8 +87,8 @@ The team's project already exists. These steps are for making a new one; to work
 
 Then by hand, in the app on web and in Expo Go:
 
-1. Signed out, Profile shows the sign-in form, and Explore, Map and Search still work
+1. Signed out, Profile shows what an account is for with Create account and Sign in, and Explore, Map and Search still work
 2. A wrong password shows "Wrong email or password."
-3. A personal account signs in, shows its email, and stays signed in after the app is closed and reopened
-4. Sign out returns to the form
+3. A personal account signs in, shows its username, and stays signed in after the app is closed and reopened
+4. Sign out, under the gear on Profile, returns to the signed-out page
 5. In the dashboard's **Table Editor**, `wall_models` has Date Wall v1 `published` with 3 `route_lines`, and the public URL `npm run seed` printed downloads the GLB
