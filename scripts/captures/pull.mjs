@@ -6,8 +6,11 @@
 //   npm run pull                    every uploaded capture
 //   npm run pull -- <capture id>    download one again, like after the PC restarted mid-pull
 import { admin, must } from "./lib.mjs";
+import { createLog, logCrashes } from "./log.mjs";
 import { claim, download, realityScanCommand } from "./steps.mjs";
 
+const log = createLog("pull");
+logCrashes(log);
 const supabase = admin();
 const again = process.argv[2];
 const pulled = [];
@@ -15,10 +18,11 @@ const pulled = [];
 if (again) {
   const capture = must("look up the capture", await supabase.from("captures").select().eq("id", again).single());
   if (capture.status !== "processing") throw new Error(`Capture ${again} is ${capture.status}, not processing`);
-  if (await download(supabase, capture)) pulled.push(capture);
+  if (await download(supabase, capture, log)) pulled.push(capture);
 } else {
   for (let capture; (capture = await claim(supabase)); ) {
-    if (await download(supabase, capture)) pulled.push(capture);
+    log(`${capture.id}: claimed by hand (wall ${capture.wall_uuid}, ${capture.photo_count} photos)`);
+    if (await download(supabase, capture, log)) pulled.push(capture);
   }
 }
 

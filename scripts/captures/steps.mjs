@@ -21,6 +21,7 @@ import {
   ROW_FILE,
   RUNS_DIR,
 } from "./lib.mjs";
+import { consoleLog, duration } from "./log.mjs";
 
 /** Below this share of photos aligned as one piece, the scan failed. */
 const MIN_ALIGNED = 0.8;
@@ -44,7 +45,7 @@ export async function interrupted(supabase) {
  * Downloads the capture's photos and scan.json to captures\<id>\. Returns what
  * it got, or null after marking the capture failed if it can't be used.
  */
-export async function download(supabase, capture, log = console.log) {
+export async function download(supabase, capture, log = consoleLog) {
   const dir = captureDir(capture.id);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, ROW_FILE), JSON.stringify(capture, null, 2));
@@ -56,6 +57,7 @@ export async function download(supabase, capture, log = console.log) {
     return fail(supabase, capture.id, `Only ${photos.length} of ${capture.photo_count} photos were uploaded.`, log);
   }
 
+  const started = Date.now();
   let bytes = 0;
   for (const name of names.filter((n) => isPhoto(n) || n === MANIFEST)) {
     const blob = must(`download ${name}`, await supabase.storage.from("captures").download(`${remoteFolder(capture)}/${name}`));
@@ -64,7 +66,7 @@ export async function download(supabase, capture, log = console.log) {
     bytes += data.length;
   }
   const manifest = names.includes(MANIFEST) ? "" : ", no scan.json";
-  log(`${capture.id}: downloaded ${photos.length} photos, ${(bytes / 1e6).toFixed(1)} MB${manifest}`);
+  log(`${capture.id}: downloaded ${photos.length} photos, ${(bytes / 1e6).toFixed(1)} MB${manifest}, in ${duration(Date.now() - started)}`);
   return { photos: photos.length, bytes };
 }
 
@@ -80,7 +82,7 @@ export function realityScanCommand(id) {
  * desktop session, not over SSH. A run past TIMEOUT_MS is stopped. Resolves with
  * whether it made a model, and whether it timed out.
  */
-export function runRealityScan(id, log = console.log) {
+export function runRealityScan(id, log = consoleLog) {
   fs.rmSync(path.join(RUNS_DIR, id), { recursive: true, force: true });
   const dir = captureDir(id);
   for (const name of fs.readdirSync(dir)) {
@@ -99,14 +101,15 @@ export function runRealityScan(id, log = console.log) {
     );
     let timedOut = false;
     let settled = false;
-    const done = (ok) => {
+    const done = (ok, code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       fs.closeSync(out);
       if (timedOut) fs.appendFileSync(logFile, `\nStopped by the worker after ${TIMEOUT_MS / 60000} minutes.\n`);
       const how = ok ? "finished" : timedOut ? "timed out" : "failed";
-      log(`${id}: RealityScan ${how} after ${Math.round((Date.now() - started) / 1000)} s`);
+      const exit = ok || timedOut ? "" : `, exit code ${code ?? "none"}`;
+      (ok ? log : log.warn)(`${id}: RealityScan ${how} after ${duration(Date.now() - started)}${exit}`);
       resolve({ ok, timedOut, logFile });
     };
     const timer = setTimeout(() => {
@@ -119,7 +122,7 @@ export function runRealityScan(id, log = console.log) {
       fs.appendFileSync(logFile, `\n${e.stack ?? e}\n`);
       done(false);
     });
-    child.on("exit", (code) => done(code === 0 && !timedOut));
+    child.on("exit", (code) => done(code === 0 && !timedOut, code));
   });
 }
 
@@ -149,7 +152,7 @@ export function failureReason(run) {
  * processed, and deletes its photos, keeping scan.json. A model given as
  * `model` skips the alignment check. Returns null if the capture failed.
  */
-export async function finish(supabase, id, { model: modelArg, log = console.log } = {}) {
+export async function finish(supabase, id, { model: modelArg, log = consoleLog } = {}) {
   const capture = must("look up the capture", await supabase.from("captures").select().eq("id", id).single());
   if (!["processing", "failed"].includes(capture.status)) {
     throw new Error(`Capture ${id} is ${capture.status}; only processing or failed captures can be finished`);
@@ -235,14 +238,14 @@ async function addVersion(supabase, capture, model, bytes, triangles) {
 }
 
 /** Marks a capture failed with a reason the person who took it sees. Its photos stay until the sweep. */
-export async function fail(supabase, id, reason, log = console.log) {
+export async function fail(supabase, id, reason, log = consoleLog) {
   await markFailed(supabase, id, reason);
-  log(`${id}: failed: ${reason}`);
+  log.warn(`${id}: failed: ${reason}`);
   return null;
 }
 
 /** Deletes photos of captures that failed or never finished uploading, after SWEEP_DAYS. */
-export async function sweep(supabase, log = console.log) {
+export async function sweep(supabase, log = consoleLog) {
   const before = new Date(Date.now() - SWEEP_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const stale = must(
     "find stale captures",

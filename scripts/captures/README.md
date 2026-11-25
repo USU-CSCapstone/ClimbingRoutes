@@ -12,7 +12,7 @@ The account has to stay logged in for the worker to run. After a reboot it start
 
 Everything goes in `C:\Users\Garage\ClimbingData` (`DATA_DIR` in `.env`):
 
-- `worker.log`: what the worker did, with times
+- `worker.log`: what the worker, `pull` and `finish` did, with times, warnings for failed captures, and errors with their stack. Over 5 MB it moves to `worker.log.1`. With nothing uploaded, the worker logs a line every hour to show it's still running
 - `captures\<capture id>\`: the photos, `scan.json` from the app, and `capture.json`, the server's row
 - `runs\<capture id>\` and `runs\<capture id>.log`: the RealityScan run and its output
 
